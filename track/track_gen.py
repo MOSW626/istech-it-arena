@@ -504,7 +504,8 @@ def build_grid_zone_slots(arr, Ltot, s0, s1, cars):
     span = arc_span(s0, s1, Ltot)
     row_spacing = span / max(1, n_rows)
     col_offsets = [GRID_COL_OFFSET, -GRID_COL_OFFSET]
-    col_stagger = [0.0, -min(GRID_STAGGER, row_spacing * 0.4)]
+    stagger = min(GRID_STAGGER, row_spacing * 0.4)
+    col_stagger = [0.0, -stagger]
     slots = []
     car_idx = 0
     for col in range(n_cols):
@@ -518,22 +519,58 @@ def build_grid_zone_slots(arr, Ltot, s0, s1, cars):
             slots.append(dict(index=car_idx, col=col, row=row, x=float(gx), y=float(gy),
                                yaw=float(th), s=float(s), length=GRID_SLOT_L, width=GRID_SLOT_W))
             car_idx += 1
-    return slots
+    return slots, stagger
 
 
-def markers_from_design(arr, Ltot, aruco_list, track_width_at, grass_half_at):
+def _wall_plate(ring, t, toward):
+    """Marker plate lying flat on the wall at arc-position t of a corridor
+    boundary ring, facing `toward` (a point on the track). Returns
+    (x, y, yaw, footprint_polygon)."""
+    from shapely.geometry import Polygon
+    size, thick = ARUCO_SIZE, 0.005
+    p = ring.interpolate(t)
+    a, b = ring.interpolate(t - size / 2.0), ring.interpolate(t + size / 2.0)
+    ux, uy = b.x - a.x, b.y - a.y
+    n = math.hypot(ux, uy) or 1.0
+    ux, uy = ux / n, uy / n
+    nx, ny = -uy, ux
+    if nx * (toward.x - p.x) + ny * (toward.y - p.y) < 0.0:
+        nx, ny = -nx, -ny
+    corners = [(p.x + ux * size / 2 + nx * thick / 2, p.y + uy * size / 2 + ny * thick / 2),
+               (p.x - ux * size / 2 + nx * thick / 2, p.y - uy * size / 2 + ny * thick / 2),
+               (p.x - ux * size / 2 - nx * thick / 2, p.y - uy * size / 2 - ny * thick / 2),
+               (p.x + ux * size / 2 - nx * thick / 2, p.y + uy * size / 2 - ny * thick / 2)]
+    return float(p.x), float(p.y), math.atan2(ny, nx), Polygon(corners)
+
+
+def markers_from_design(arr, Ltot, aruco_list, track_width_at, grass_half_at, corridor, drivable):
+    """Markers are mounted flat ON the wall, per the README: take the intended
+    position (s + side offset), snap it to the nearest point of the corridor
+    boundary -- which is exactly the wall's inner face -- and lay the plate
+    along that wall. Where the snap lands on a wall corner (the 갈림길 mouths)
+    a flush plate would still cut across the lane, so slide along the wall to
+    the closest spot whose footprint stays out of the drivable area."""
+    from shapely.geometry import Point
+    rings = [corridor.exterior] + list(corridor.interiors)
     markers = []
     for m in aruco_list:
         s = float(m["s"]) % Ltot
         side = 1.0 if m.get("side", "left") == "left" else -1.0
         x, y, th = sample_at_s(arr, s, Ltot)
-        tw = track_width_at(s)
-        gh = grass_half_at(s)
-        off = side * (tw / 2.0 + gh * 0.4 + 0.05)
-        mx = x - math.sin(th) * off
-        my = y + math.cos(th) * off
-        inward = (-side * (-math.sin(th)), -side * math.cos(th))
-        yaw = math.atan2(inward[1], inward[0])
+        off = side * (track_width_at(s) / 2.0 + grass_half_at(s) * 0.4 + 0.05)
+        want = Point(x - math.sin(th) * off, y + math.cos(th) * off)
+        ring = min(rings, key=lambda r: r.distance(want))
+        t0 = ring.project(want)
+        plate = None
+        for k in range(51):
+            for t in ([t0] if k == 0 else [t0 - k * 0.02, t0 + k * 0.02]):
+                cand = _wall_plate(ring, t % ring.length, Point(x, y))
+                if cand[3].intersection(drivable).area < 1e-9:
+                    plate = cand
+                    break
+            if plate:
+                break
+        mx, my, yaw, _ = plate or _wall_plate(ring, t0, Point(x, y))
         mid = int(m["id"])
         fake = bool(m.get("fake", False))
         role = ("fake" if fake else REAL_IDS.get(mid, "custom"))
@@ -1121,15 +1158,20 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
 
     grid_slots = []
     grid_cars = 0
+    grid_stagger = GRID_STAGGER
     gz = feats.get("grid_zone")
     if gz:
         grid_cars = int(grid_cars_override if grid_cars_override is not None else gz.get("cars", 6))
-        grid_slots = build_grid_zone_slots(arr, Ltot, float(gz["s0"]) % Ltot, float(gz["s1"]) % Ltot, grid_cars)
+        grid_slots, grid_stagger = build_grid_zone_slots(arr, Ltot, float(gz["s0"]) % Ltot,
+                                                          float(gz["s1"]) % Ltot, grid_cars)
 
     tl_in = feats.get("traffic_light") or {"s": 0.0, "side": "left"}
     traffic_light = traffic_light_from_design(arr, Ltot, tl_in, track_width_at)
 
-    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [], track_width_at, grass_half_at)
+    corridor = build_corridor_polygon(arr, tw_arr, branches)
+    drivable = build_corridor_polygon(arr, tw_arr, branches, grass_w=0.0)
+    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [], track_width_at,
+                                   grass_half_at, corridor, drivable)
 
     min_r_general = compute_min_radius(arr, closed)
 
@@ -1155,7 +1197,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
         centroid=centroid.tolist(), startfinish_s=startfinish_s,
         narrow_zones=meta_narrow_zones,
         grid_start_s=(float(gz["s0"]) % Ltot if gz else 0.0), grid_ext=0.0,
-        design_mode=True,
+        grid_stagger=float(grid_stagger), design_mode=True,
     )
 
     return dict(arr=arr, left_b=left_b, right_b=right_b, left_grass_out=left_grass_out,
@@ -1402,25 +1444,34 @@ def write_csvs(res, outdir):
                 f.write(f"{row[0]:.5f},{row[1]:.5f},{row[3]:.5f},{b['width_m']:.4f}\n")
 
 
-def build_union_wall_boxes(res, wall_step):
-    """Design-mode walls: buffer/union the whole drivable corridor (main ribbon
-    + grass + branch ribbons) with shapely, then box up its boundary rings.
-    Replaces the per-ribbon gap-cutting for walls, which left floating wall
-    stubs wherever a branch ran close alongside the main track. Inner islands
-    (between a branch and the main road) only get a wall if a wall physically
-    fits inside them; sliver islands are dropped."""
-    from shapely.geometry import LineString, Polygon as ShPolygon
+def build_corridor_polygon(arr, tw_arr, branches, scale=1.0, grass_w=GRASS_W):
+    """Drivable corridor (main ribbon + grass + branch ribbons) as one polygon.
+    Its boundary is exactly where the design-mode walls go, so marker placement
+    and wall generation both derive from it. grass_w=0 gives the bare drivable
+    area instead."""
+    from shapely.geometry import LineString
     from shapely.ops import unary_union
-    meta = res["meta"]
-    wt = meta["wall_t"]
-    pts = res["arr"][:, :2].tolist()
+    pts = arr[:, :2].tolist()
     pts.append(pts[0])
-    parts = [LineString(pts).buffer(float(np.max(res["tw_arr"])) / 2.0 + GRASS_W * meta["scale"])]
-    for br in (res.get("branches") or []):
+    parts = [LineString(pts).buffer(float(np.max(tw_arr)) / 2.0 + grass_w * scale)]
+    for br in (branches or []):
         parts.append(LineString(br["arr"][:, :2]).buffer(br["width_m"] / 2.0))
     corridor = unary_union(parts).buffer(0)
     if corridor.geom_type == "MultiPolygon":
         corridor = max(corridor.geoms, key=lambda g: g.area)
+    return corridor
+
+
+def build_union_wall_boxes(res, wall_step):
+    """Design-mode walls: box up the corridor's boundary rings. Replaces the
+    per-ribbon gap-cutting for walls, which left floating wall stubs wherever a
+    branch ran close alongside the main track. Inner islands (between a branch
+    and the main road) only get a wall if a wall physically fits inside them;
+    sliver islands are dropped."""
+    from shapely.geometry import Polygon as ShPolygon
+    meta = res["meta"]
+    wt = meta["wall_t"]
+    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"])
     rings = [corridor.buffer(wt / 2.0).exterior]
     for hole in corridor.interiors:
         inner = ShPolygon(hole).buffer(-wt / 2.0)
@@ -1608,24 +1659,36 @@ def write_map(res, boxes, outdir, resolution):
     return dict(origin=(x0, y0), size=(W, H))
 
 
-def _sdf_box_link(name, x, y, z, yaw, sx, sy, sz, rgba, static_friction=None):
+def _sdf_box_shapes(name, x, y, z, yaw, sx, sy, sz, rgba, static_friction=None):
+    """collision+visual pair for one box, each carrying its own <pose> so that
+    many boxes can share a single link (see _sdf_merged_link)."""
     fric = ""
     if static_friction is not None:
         fric = f"""
         <surface><friction><ode><mu>{static_friction}</mu><mu2>{static_friction}</mu2></ode></friction></surface>"""
+    pose = f"<pose>{x:.4f} {y:.4f} {z:.4f} 0 0 {yaw:.5f}</pose>"
     return f"""
-    <link name="{name}">
-      <pose>{x:.4f} {y:.4f} {z:.4f} 0 0 {yaw:.5f}</pose>
       <collision name="{name}_col">
+        {pose}
         <geometry><box><size>{sx:.4f} {sy:.4f} {sz:.4f}</size></box></geometry>{fric}
       </collision>
       <visual name="{name}_vis">
+        {pose}
         <geometry><box><size>{sx:.4f} {sy:.4f} {sz:.4f}</size></box></geometry>
         <material>
           <ambient>{rgba}</ambient><diffuse>{rgba}</diffuse>
         </material>
-      </visual>
+      </visual>"""
+
+
+def _sdf_merged_link(name, shapes):
+    return f"""
+    <link name="{name}">{"".join(shapes)}
     </link>"""
+
+
+def _sdf_box_link(name, *args, **kwargs):
+    return _sdf_merged_link(name, [_sdf_box_shapes(name, *args, **kwargs)])
 
 
 def write_sdf(res, boxes, outdir):
@@ -1648,23 +1711,33 @@ def write_sdf(res, boxes, outdir):
     </link>"""
     links.append(ground)
 
+    # The repeated static box chains (road surface / grass / walls) are merged
+    # into ONE link each: >1000 links made DART's first physics update take
+    # minutes. Geometry is unchanged -- every box just carries its own pose on
+    # the visual/collision element instead of on a link of its own.
+    surface_shapes, grass_shapes, wall_shapes = [], [], []
     for key in ("surface_main", "surface_fork1", "surface_fork2") + branch_surface_keys:
         for i, b in enumerate(boxes.get(key, [])):
-            links.append(_sdf_box_link(f"{key}_{i}", b["x"], b["y"], 0.0015, b["yaw"],
-                                        b["length"], b["width"], 0.003, "0.12 0.12 0.13 1"))
+            surface_shapes.append(_sdf_box_shapes(f"{key}_{i}", b["x"], b["y"], 0.0015, b["yaw"],
+                                                   b["length"], b["width"], 0.003, "0.12 0.12 0.13 1"))
 
     for key in ("grass_main_left", "grass_main_right", "grass_fork1_left", "grass_fork1_right",
                 "grass_fork2_left", "grass_fork2_right"):
         for i, b in enumerate(boxes.get(key, [])):
-            links.append(_sdf_box_link(f"{key}_{i}", b["x"], b["y"], 0.001, b["yaw"],
-                                        b["length"], b["width"], 0.002, "0.13 0.55 0.13 1"))
+            grass_shapes.append(_sdf_box_shapes(f"{key}_{i}", b["x"], b["y"], 0.001, b["yaw"],
+                                                 b["length"], b["width"], 0.002, "0.13 0.55 0.13 1"))
 
     for key in ("walls_main_left", "walls_main_right", "walls_fork1_left", "walls_fork1_right",
                 "walls_fork2_left", "walls_fork2_right") + branch_wall_keys:
         for i, b in enumerate(boxes.get(key, [])):
-            links.append(_sdf_box_link(f"{key}_{i}", b["x"], b["y"], wall_h / 2.0, b["yaw"],
-                                        b["length"], wall_t, wall_h, "0.85 0.85 0.85 1",
-                                        static_friction=0.8))
+            wall_shapes.append(_sdf_box_shapes(f"{key}_{i}", b["x"], b["y"], wall_h / 2.0, b["yaw"],
+                                                b["length"], wall_t, wall_h, "0.85 0.85 0.85 1",
+                                                static_friction=0.8))
+
+    for name, shapes in (("track_surface", surface_shapes), ("grass", grass_shapes),
+                          ("walls", wall_shapes)):
+        if shapes:
+            links.append(_sdf_merged_link(name, shapes))
 
     # 노면변화 friction-change patch(es): distinct color + lower friction coefficient
     for j, fz in enumerate(get_friction_zones(res)):
@@ -1678,12 +1751,13 @@ def write_sdf(res, boxes, outdir):
         links.append(_sdf_box_link(f"bump_{i}", bmp["x"], bmp["y"], bmp["height"] / 2.0, bmp["yaw"],
                                     bmp["width"], bmp["length"], bmp["height"], "0.9 0.6 0.1 1"))
 
-    # starting-grid painted-line boxes (flat, non-colliding visuals only)
+    # starting-grid painted-line boxes (flat, non-colliding visuals only).
+    # z sits just above the road surface top (0.003) so the paint stays visible.
     for g in res["grid_slots"]:
         name = f"grid_slot_{g['index']}"
         links.append(f"""
     <link name="{name}">
-      <pose>{g['x']:.4f} {g['y']:.4f} 0.0012 0 0 {g['yaw']:.5f}</pose>
+      <pose>{g['x']:.4f} {g['y']:.4f} 0.0037 0 0 {g['yaw']:.5f}</pose>
       <visual name="{name}_vis">
         <geometry><box><size>{g['length']:.4f} {g['width']:.4f} 0.001</size></box></geometry>
         <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
@@ -1729,15 +1803,15 @@ def write_sdf(res, boxes, outdir):
         thick = 0.005 * meta["scale"]
         name = f"aruco_{m['id']}"
         yaw = m["yaw"]
-        img = f"../aruco/aruco_id{m['id']}.png"
+        img = f"aruco/aruco_id{m['id']}.png"
         links.append(f"""
     <link name="{name}">
       <pose>{m['x']:.4f} {m['y']:.4f} {m['z']+size/2:.4f} 0 0 {yaw:.5f}</pose>
       <visual name="{name}_vis">
         <geometry><box><size>{thick:.4f} {size:.4f} {size:.4f}</size></box></geometry>
         <material>
+          <diffuse>1 1 1 1</diffuse>
           <pbr><metal><albedo_map>{img}</albedo_map></metal></pbr>
-          <script><uri>{img}</uri></script>
         </material>
       </visual>
       <collision name="{name}_col">
@@ -1963,6 +2037,9 @@ def write_scene_json(res, outdir, checks):
             dict(width_m=t["width_m"], s_center_m=round(t["s_center"], 3), taper_length_m=NARROW_TAPER_LEN)
             for t in narrow_targets
         ]
+    sf_s = float(meta.get("startfinish_s", 0.0)) % Ltot
+    sf_x, sf_y, sf_th = sample_at_s(arr, sf_s, Ltot)
+
     fz_list = get_friction_zones(res)
     if len(fz_list) == 1:
         track_dict["friction_zone"] = fz_list[0]
@@ -1979,6 +2056,12 @@ def write_scene_json(res, outdir, checks):
         "resolution_m_per_px": meta["resolution"],
         "vehicle": {"length_m": VEHICLE_L * meta["scale"], "width_m": VEHICLE_W * meta["scale"]},
         "track": track_dict,
+        "start_finish": {
+            "s_m": round(sf_s, 4),
+            "pose": {"x": round(float(sf_x), 4), "y": round(float(sf_y), 4),
+                      "yaw_rad": round(float(sf_th), 4)},
+            "note": "공식 출발/결승 기준. 신호등·ArUco ID0·체커라인이 모두 이 지점에 정렬됨.",
+        },
         "alt_routes": ({
             "fork1": {
                 "name": "갈림길①", "location": "섹터3 시케인(훅) 우회",
@@ -2012,7 +2095,7 @@ def write_scene_json(res, outdir, checks):
         "starting_grid": {
             "car_count": meta["grid_cars"], "columns": 2,
             "slot_length_m": GRID_SLOT_L * meta["scale"], "slot_width_m": GRID_SLOT_W * meta["scale"],
-            "longitudinal_stagger_m": GRID_STAGGER * meta["scale"],
+            "longitudinal_stagger_m": round(meta.get("grid_stagger", GRID_STAGGER) * meta["scale"], 4),
             "extension_added_m": meta["grid_ext"],
             "grid_start_s_m": round(meta["grid_start_s"], 3),
             "slots": [dict(index=g["index"], col=g["col"], row=g["row"],

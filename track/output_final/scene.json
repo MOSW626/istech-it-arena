@@ -3529,6 +3529,15 @@
     "sectors": [],
     "friction_zone": null
   },
+  "start_finish": {
+    "s_m": 0.0,
+    "pose": {
+      "x": 9.966,
+      "y": 6.4665,
+      "yaw_rad": 1.5694
+    },
+    "note": "\uacf5\uc2dd \ucd9c\ubc1c/\uacb0\uc2b9 \uae30\uc900. \uc2e0\ud638\ub4f1\u00b7ArUco ID0\u00b7\uccb4\ucee4\ub77c\uc778\uc774 \ubaa8\ub450 \uc774 \uc9c0\uc810\uc5d0 \uc815\ub82c\ub428."
+  },
   "alt_routes": {},
   "branches": [
     {
@@ -4153,7 +4162,7 @@
     "columns": 2,
     "slot_length_m": 0.25,
     "slot_width_m": 0.17,
-    "longitudinal_stagger_m": 0.3,
+    "longitudinal_stagger_m": 0.2,
     "extension_added_m": 0.0,
     "grid_start_s_m": 44.596,
     "slots": [
@@ -4260,10 +4269,10 @@
         "real": true,
         "role": "start_finish",
         "pose": {
-          "x": 10.321,
-          "y": 6.466,
+          "x": 10.391,
+          "y": 6.4659,
           "z": 0.05,
-          "yaw_rad": 3.1402
+          "yaw_rad": 3.1401
         },
         "normal_note": "yaw points along the marker's outward-facing normal, toward the track",
         "s_m": 0.0,
@@ -4274,10 +4283,10 @@
         "real": true,
         "role": "gate12",
         "pose": {
-          "x": 7.9553,
-          "y": 9.1192,
+          "x": 8.0253,
+          "y": 9.1195,
           "z": 0.05,
-          "yaw_rad": -3.1366
+          "yaw_rad": -3.1367
         },
         "normal_note": "yaw points along the marker's outward-facing normal, toward the track",
         "s_m": 12.6,
@@ -4288,10 +4297,10 @@
         "real": true,
         "role": "grid_entry",
         "pose": {
-          "x": 9.6063,
-          "y": 5.7823,
+          "x": 9.5363,
+          "y": 5.7828,
           "z": 0.05,
-          "yaw_rad": -0.0071
+          "yaw_rad": -0.007
         },
         "normal_note": "yaw points along the marker's outward-facing normal, toward the track",
         "s_m": 45.946,
@@ -4302,10 +4311,10 @@
         "real": true,
         "role": "gate23",
         "pose": {
-          "x": 2.5821,
-          "y": 2.4694,
+          "x": 2.6433,
+          "y": 2.5683,
           "z": 0.05,
-          "yaw_rad": -2.9916
+          "yaw_rad": -3.1049
         },
         "normal_note": "yaw points along the marker's outward-facing normal, toward the track",
         "s_m": 32.897,
