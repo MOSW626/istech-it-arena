@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IT 아레나 코스 후보 1 · 2 · 3</title>
+<style>
+  :root{
+    --bg:#f6f5f1; --card:#fff; --ink:#1c1c1a; --muted:#6a6a63; --line:#e4e2da;
+    --s1:#1d9e75; --s2:#ef9f27; --s3:#7f77dd; --hard:#d1362f; --grass:#8bbf4d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",Pretendard,"Noto Sans KR",sans-serif;
+    line-height:1.65;-webkit-font-smoothing:antialiased}
+  .page{max-width:1100px;margin:0 auto;padding:40px 24px 72px}
+  .eyebrow{font-size:13px;letter-spacing:.04em;color:#185fa5;font-weight:600;margin:0 0 6px}
+  h1{font-size:30px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+  .sub{color:var(--muted);font-size:15px;margin:0}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 18px;margin:22px 0 0;padding:14px 16px;
+    background:var(--card);border:1px solid var(--line);border-radius:12px;font-size:13px;color:var(--muted)}
+  .legend b{color:var(--ink);font-weight:600}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .sw{width:15px;height:15px;border-radius:3px;display:inline-block}
+  .compare{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:18px;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .compare th,.compare td{padding:11px 12px;border-bottom:1px solid var(--line);text-align:left}
+  .compare th{background:#f0ede5;font-weight:600}
+  .compare td:first-child{color:var(--muted)}
+  .stage{background:var(--card);border:1px solid var(--line);border-radius:16px;
+    padding:20px;margin-top:22px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .thead{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:0 0 4px}
+  .badge{font-size:12px;font-weight:700;color:#fff;background:#185fa5;padding:3px 10px;border-radius:20px}
+  .thead h2{font-size:22px;margin:0;font-weight:700}
+  .motif{color:var(--muted);font-size:14px}
+  .figure{width:100%;display:block;background:#faf9f6;border:1px solid var(--line);border-radius:12px}
+  h3.sec{font-size:14px;font-weight:700;margin:2px 0 12px;display:flex;align-items:center;gap:8px}
+  h3.sec::before{content:"";width:4px;height:15px;border-radius:2px;background:#185fa5}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:22px}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}}
+  table.spec{width:100%;border-collapse:collapse;font-size:13.5px}
+  table.spec td{padding:7px 2px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.spec td:first-child{color:var(--muted);width:32%;white-space:nowrap}
+  .sectorcard{border-left:5px solid;padding:9px 14px;margin-bottom:9px;background:#faf9f6}
+  .sectorcard h4{margin:0 0 2px;font-size:14px;font-weight:700}
+  .sectorcard p{margin:0;font-size:13px;color:var(--muted)}
+  table.risk{width:100%;border-collapse:collapse;font-size:13px}
+  table.risk th,table.risk td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:center}
+  table.risk th{background:#f3f0e8;color:var(--ink);font-weight:600;font-size:12.5px}
+  table.risk td:first-child{text-align:left;font-weight:600}
+  .gain{color:#0f6e56;font-weight:700}.loss{color:#a32d2d;font-weight:700}.be{color:#8a5a08;font-weight:700}
+  .fork{margin-top:24px;background:#fbf6ec;border:1px solid #f0e2c6;border-radius:14px;padding:20px 22px}
+  .fork h3{margin:0 0 6px;font-size:16px;color:#8a5a08}
+  .fork p{margin:0 0 14px;font-size:14px;color:#6a5a3a}
+  .fork .diagram{display:block;margin:0 auto;max-width:560px;width:100%}
+  .box{border:1px solid var(--line);border-radius:12px;padding:14px 16px;font-size:13.5px;background:#f3f7fb}
+  .box ul{margin:8px 0 0;padding-left:18px} .box li{margin:5px 0}
+  .callout{margin-top:22px;background:#fbf6ec;border:1px solid #f0e2c6;border-radius:14px;padding:20px 22px}
+  .callout h3{margin:0 0 6px;font-size:16px;color:#8a5a08}
+  .callout p{margin:0 0 6px;font-size:14px;color:#6a5a3a}
+  .callout code{background:#f2e6cd;padding:2px 7px;border-radius:5px;font-size:13px}
+  .foot-note{color:var(--muted);font-size:12px;margin-top:22px;text-align:center}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <p class="eyebrow">IT ARENA — 자율주행 로봇 레이싱</p>
+  <h1>코스 후보 1 · 2 · 3</h1>
+  <p class="sub">도로폭 45cm(차체 15×3대) · F1식 3섹터 컬러 · 갈림길은 「갈까 말까」 손익형(1대 폭 인컷 + 배리어)</p>
+
+  <div class="legend">
+    <span><span class="sw" style="background:var(--s1)"></span><b>섹터 1</b></span>
+    <span><span class="sw" style="background:var(--s2)"></span><b>섹터 2</b></span>
+    <span><span class="sw" style="background:var(--s3)"></span><b>섹터 3</b></span>
+    <span><span class="sw" style="background:linear-gradient(90deg,#d1362f 50%,#fff 50%);border:1px solid #ddd"></span><b>연석</b></span>
+    <span><span class="sw" style="background:#6a6a63"></span><b>지름길</b> 1대 폭</span>
+    <span><span class="sw" style="background:#111"></span><b>ArUco</b></span>
+    <span><span class="sw" style="background:var(--grass)"></span><b>노면변화</b></span>
+    <span>🚦 스타트 · ▮ 과속방지턱</span>
+  </div>
+
+  <table class="compare">
+    <tr><th>후보</th><th>성격</th><th>주 추월</th><th>갈림길 손익분기</th><th>제작</th></tr>
+    <tr><td><b>1 통합안</b></td><td>A(롱 스트레이트·헤어핀·에세스) + B(직각 시케인) 통합</td><td>메인 직선·헤어핀·갈림길</td><td>68% / 68%</td><td>중</td></tr>
+    <tr><td><b>2 인필드</b></td><td>중속 테크니컬 + 인필드 시케인</td><td>인필드 진입</td><td>70% / 76%</td><td>중</td></tr>
+    <tr><td><b>3 스프린트</b></td><td>2 롱 스트레이트 + 하이스피드 스윕 + 헤어핀</td><td>양 끝 직선</td><td>67% / 78%</td><td>중</td></tr>
+  </table>
+
+  <!-- ============ CANDIDATE 1 : 통합안 (그대로) ============ -->
+  <div class="stage">
+    <div class="thead"><span class="badge">후보 1</span><h2>통합 코스 (A + B)</h2><span class="motif">A의 롱 스트레이트·헤어핀·에세스 + B의 직각 시케인</span></div>
+    <svg class="figure" viewBox="0 0 800 470" role="img" aria-label="후보 1 통합 코스 도면">
+      <defs>
+        <pattern id="haz" width="8" height="8" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="4" height="8" fill="#1c1c1a"/></pattern>
+        <path id="s1" d="M150,410 L585,410 C695,410 695,325 585,325 L470,325"/>
+        <path id="s2" d="M470,325 C430,368 340,368 300,325 L300,262 L232,262 L232,205 C232,158 320,168 322,132 C324,96 250,96 228,120"/>
+        <path id="s3" d="M228,120 L170,140 C120,180 120,230 150,270 C138,330 140,410 150,410"/>
+        <path id="sc1" d="M470,325 L300,325"/>
+        <path id="sc2" d="M170,140 L150,270"/>
+      </defs>
+      <rect x="283" y="268" width="34" height="46" fill="#8bbf4d" opacity="0.9"/>
+      <g fill="#5f8a2a" opacity="0.5"><circle cx="292" cy="278" r="2"/><circle cx="306" cy="290" r="2"/><circle cx="296" cy="302" r="2"/><circle cx="309" cy="274" r="2"/></g>
+      <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <use href="#s1" stroke="#d1362f" stroke-width="44"/><use href="#s2" stroke="#d1362f" stroke-width="44"/><use href="#s3" stroke="#d1362f" stroke-width="44"/>
+        <use href="#s1" stroke="#fff" stroke-width="44" stroke-dasharray="13 13"/><use href="#s2" stroke="#fff" stroke-width="44" stroke-dasharray="13 13"/><use href="#s3" stroke="#fff" stroke-width="44" stroke-dasharray="13 13"/>
+        <use href="#s1" stroke="#1d9e75" stroke-width="34"/><use href="#s2" stroke="#ef9f27" stroke-width="34"/><use href="#s3" stroke="#7f77dd" stroke-width="34"/>
+        <use href="#s1" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 10" opacity="0.65"/><use href="#s2" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 10" opacity="0.55"/><use href="#s3" stroke="#fff" stroke-width="1.3" stroke-dasharray="6 10" opacity="0.65"/>
+      </g>
+      <g fill="none" stroke-linejoin="round" stroke-linecap="round">
+        <use href="#sc1" stroke="#d1362f" stroke-width="21"/><use href="#sc2" stroke="#d1362f" stroke-width="21"/>
+        <use href="#sc1" stroke="#fff" stroke-width="21" stroke-dasharray="8 8"/><use href="#sc2" stroke="#fff" stroke-width="21" stroke-dasharray="8 8"/>
+        <use href="#sc1" stroke="#6a6a63" stroke-width="13"/><use href="#sc2" stroke="#6a6a63" stroke-width="13"/>
+        <use href="#sc1" stroke="#e8b53a" stroke-width="1.2" stroke-dasharray="5 6"/><use href="#sc2" stroke="#e8b53a" stroke-width="1.2" stroke-dasharray="5 6"/>
+      </g>
+      <g>
+        <rect x="452" y="303" width="16" height="16" fill="#111"/><rect x="455" y="306" width="5" height="5" fill="#fff"/><rect x="461" y="312" width="4" height="4" fill="#fff"/>
+        <rect x="176" y="150" width="16" height="16" fill="#111"/><rect x="179" y="153" width="5" height="5" fill="#fff"/><rect x="185" y="159" width="4" height="4" fill="#fff"/>
+      </g>
+      <g>
+        <g fill="#2c3e50"><rect x="345" y="396" width="18" height="8" rx="2"/><rect x="345" y="407" width="18" height="8" rx="2"/><rect x="345" y="418" width="18" height="8" rx="2"/></g>
+        <g fill="#8fb0cf"><rect x="356" y="398" width="4" height="4" rx="1"/><rect x="356" y="409" width="4" height="4" rx="1"/><rect x="356" y="420" width="4" height="4" rx="1"/></g>
+        <rect x="372" y="321" width="18" height="8" rx="2" fill="#2c3e50"/><rect x="383" y="323" width="4" height="4" rx="1" fill="#8fb0cf"/>
+        <rect x="155" y="198" width="8" height="18" rx="2" fill="#2c3e50"/><rect x="157" y="209" width="4" height="4" rx="1" fill="#8fb0cf"/>
+      </g>
+      <g>
+        <rect x="200" y="393" width="9" height="34" fill="#111"/>
+        <rect x="200" y="393" width="4.5" height="6" fill="#fff"/><rect x="204.5" y="399" width="4.5" height="6" fill="#fff"/>
+        <rect x="200" y="405" width="4.5" height="6" fill="#fff"/><rect x="204.5" y="411" width="4.5" height="6" fill="#fff"/>
+        <rect x="200" y="417" width="4.5" height="6" fill="#fff"/><rect x="204.5" y="423" width="4.5" height="4" fill="#fff"/>
+        <rect x="188" y="437" width="30" height="12" rx="3" fill="#222"/>
+        <circle cx="196" cy="443" r="3.2" fill="#e2413b"/><circle cx="204" cy="443" r="3.2" fill="#e8b53a"/><circle cx="212" cy="443" r="3.2" fill="#4bbd6b"/>
+      </g>
+      <g transform="translate(510,393)"><rect x="0" y="0" width="15" height="34" fill="#e8b53a"/><rect x="0" y="0" width="15" height="34" fill="url(#haz)"/></g>
+      <g fill="#f4f4f2"><path d="M300,410 l-17,-7 v4 h-28 v6 h28 v4 Z"/></g>
+      <g stroke="#1c1c1a" stroke-width="2"><line x1="470" y1="306" x2="470" y2="344"/><line x1="215" y1="106" x2="241" y2="134"/></g>
+      <g font-size="12" font-weight="700">
+        <circle cx="470" cy="298" r="9" fill="#fff" stroke="#1c1c1a"/><text x="470" y="302" text-anchor="middle" fill="#1c1c1a" font-size="10">1|2</text>
+        <circle cx="248" cy="104" r="9" fill="#fff" stroke="#1c1c1a"/><text x="248" y="108" text-anchor="middle" fill="#1c1c1a" font-size="10">2|3</text>
+      </g>
+      <g stroke="#1c1c1a" stroke-width="1"><line x1="258" y1="393" x2="258" y2="427"/><line x1="254" y1="393" x2="262" y2="393"/><line x1="254" y1="427" x2="262" y2="427"/></g>
+      <text x="266" y="414" font-size="12" fill="#1c1c1a">45 cm · 3대</text>
+      <text x="360" y="349" font-size="11" fill="#8a5a08" font-weight="700">15 cm · 1대</text>
+      <g font-weight="700" font-size="13">
+        <text x="640" y="300" fill="#1d9e75">T1 헤어핀</text>
+        <text x="150" y="252" fill="#ef9f27">시케인</text>
+        <text x="332" y="150" fill="#ef9f27">에세스</text>
+        <text x="70" y="300" fill="#7f77dd">롱 스위퍼</text>
+      </g>
+      <g font-size="12" font-weight="700" fill="#8a5a08">
+        <text x="330" y="392">갈림길 ①</text>
+        <text x="58" y="205">갈림길 ②</text>
+      </g>
+      <text x="150" y="384" font-size="10" fill="#6a6a63">정상: 3대·길지만 안전</text>
+      <text x="218" y="435" font-size="11" fill="#6a6a63">출발/피니시</text>
+      <text x="286" y="262" font-size="10" fill="#5f8a2a" font-weight="700">노면변화</text>
+      <g font-size="12" font-weight="700">
+        <rect x="405" y="428" width="70" height="20" rx="10" fill="#1d9e75"/><text x="440" y="442" text-anchor="middle" fill="#04342c">섹터 1</text>
+        <rect x="352" y="232" width="70" height="20" rx="10" fill="#ef9f27"/><text x="387" y="246" text-anchor="middle" fill="#633806">섹터 2</text>
+        <rect x="60" y="150" width="70" height="20" rx="10" fill="#7f77dd"/><text x="95" y="164" text-anchor="middle" fill="#26215c">섹터 3</text>
+      </g>
+    </svg>
+
+    <div class="cols">
+      <div>
+        <h3 class="sec">코스 사양</h3>
+        <table class="spec">
+          <tr><td>구성</td><td>A(롱 스트레이트·T1 헤어핀·에세스·롱 스위퍼) + B(직각 시케인) 통합</td></tr>
+          <tr><td>도로 폭</td><td>45 cm — 차체 15cm 3대 동시 진입</td></tr>
+          <tr><td>섹터</td><td>3개 (F1식 컬러) · 각 구간 랩타임 계측 가능</td></tr>
+          <tr><td>갈림길</td><td>2곳 — 3대 폭 정상루트 ↔ 1대 폭 지름길 · ArUco</td></tr>
+          <tr><td>기믹</td><td>신호등 · 과속방지턱(메인) · 노면변화(시케인)</td></tr>
+          <tr><td>제작</td><td>중 — 직선/직각(B) 표준 패널, 곡벽(A) 3곳</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3 class="sec">지름길 손익 (갈까 말까?)</h3>
+        <table class="risk"><tr><th>갈림길</th><th>성공 이득</th><th>실패 손해</th><th>손익분기</th></tr>
+          <tr><td>① 시케인 인컷</td><td class="gain">−1.2 s</td><td class="loss">+2.6 s</td><td class="be">68%</td></tr>
+          <tr><td>② 좌측 인컷</td><td class="gain">−0.9 s</td><td class="loss">+1.9 s</td><td class="be">68%</td></tr>
+        </table>
+        <div class="sectorcard" style="border-color:var(--s1);margin-top:12px"><h4 style="color:#0f6e56">섹터 1 · 파워</h4><p>출발 → 롱 스트레이트(과속방지턱) → T1 헤어핀.</p></div>
+        <div class="sectorcard" style="border-color:var(--s2)"><h4 style="color:#854f0b">섹터 2 · 테크니컬</h4><p>갈림길① → 직각 시케인(노면변화) → 에세스.</p></div>
+        <div class="sectorcard" style="border-color:var(--s3)"><h4 style="color:#3c3489">섹터 3 · 플로우</h4><p>갈림길② → 롱 스위퍼 → 스타트 복귀.</p></div>
+      </div>
+    </div>
+
+    <div class="fork">
+      <h3>갈림길(지름길)은 이렇게 작동해 — 3개 코스 공통</h3>
+      <p>도로가 이미 3대 폭이라 단순히 가로지르는 건 지름길이 아님. 트랙이 실제로 두 갈래로 <b>분기</b>했다가 다시 <b>합류</b>하고, 「짧지만 어려운 길 vs 길지만 순탄한 길」로 나뉨.</p>
+      <svg class="diagram" viewBox="0 0 560 200" role="img" aria-label="갈림길 작동 방식">
+        <path d="M70,100 C150,100 150,160 250,160 C350,160 350,100 490,100" fill="none" stroke="#d1362f" stroke-width="42" stroke-linecap="round"/>
+        <path d="M70,100 C150,100 150,160 250,160 C350,160 350,100 490,100" fill="none" stroke="#fff" stroke-width="42" stroke-linecap="round" stroke-dasharray="12 12"/>
+        <path d="M70,100 C150,100 150,160 250,160 C350,160 350,100 490,100" fill="none" stroke="#c9c7bf" stroke-width="32" stroke-linecap="round"/>
+        <path d="M120,96 L440,96" fill="none" stroke="#d1362f" stroke-width="20" stroke-linecap="round"/>
+        <path d="M120,96 L440,96" fill="none" stroke="#fff" stroke-width="20" stroke-linecap="round" stroke-dasharray="7 7"/>
+        <path d="M120,96 L440,96" fill="none" stroke="#6a6a63" stroke-width="12" stroke-linecap="round"/>
+        <rect x="126" y="80" width="14" height="14" fill="#111"/><rect x="129" y="83" width="4" height="4" fill="#fff"/>
+        <g fill="#2c3e50"><rect x="240" y="150" width="16" height="7" rx="2"/><rect x="258" y="150" width="16" height="7" rx="2"/><rect x="276" y="150" width="16" height="7" rx="2"/><rect x="270" y="92" width="16" height="7" rx="2"/></g>
+        <text x="280" y="188" text-anchor="middle" font-size="13" font-weight="700" fill="#5f5e5a">정상 루트 · 3대 나란히 · 길지만 안전</text>
+        <text x="280" y="66" text-anchor="middle" font-size="13" font-weight="700" fill="#8a5a08">지름길 · 1대 폭으로 좁아짐 · 짧지만 제어 어려움</text>
+        <text x="500" y="104" font-size="12" fill="#5f5e5a">합류</text><text x="30" y="104" font-size="12" fill="#5f5e5a">분기</text>
+      </svg>
+    </div>
+  </div>
+
+  <!-- ============ CANDIDATE 2 : 인필드 (스플라인) ============ -->
+  <div class="stage">
+    <div class="thead"><span class="badge" style="background:#b5731a">후보 2</span><h2>인필드 서킷</h2><span class="motif">중속 테크니컬 · 인필드 시케인 · 연속 코너</span></div>
+    <svg id="c2" class="figure" viewBox="0 0 820 540" role="img" aria-label="후보 2 인필드 서킷"></svg>
+    <div class="cols">
+      <div><h3 class="sec">특징</h3>
+        <table class="spec">
+          <tr><td>성격</td><td>중속 코너가 촘촘한 테크니컬 레이아웃 + 안쪽으로 파고드는 인필드 시케인</td></tr>
+          <tr><td>추월</td><td>인필드 진입 브레이킹, 갈림길 2곳</td></tr>
+          <tr><td>기믹</td><td>신호등 · 과속방지턱 · 노면변화(지름길② 입구, 젖음)</td></tr>
+          <tr><td>제작</td><td>중 — 코너 많지만 반경 큰 곡벽 위주</td></tr>
+        </table>
+      </div>
+      <div><h3 class="sec">지름길 손익 (갈까 말까?)</h3>
+        <table class="risk"><tr><th>갈림길</th><th>성공 이득</th><th>실패 손해</th><th>손익분기</th></tr>
+          <tr><td>① 우측 고속</td><td class="gain">−1.1 s</td><td class="loss">+2.6 s</td><td class="be">70%</td></tr>
+          <tr><td>② 좌상(젖음)</td><td class="gain">−0.7 s</td><td class="loss">+2.2 s</td><td class="be">76%</td></tr>
+        </table>
+        <p style="font-size:12.5px;color:var(--muted);margin-top:8px">②는 젖은 노면 겹쳐 손익분기 76% — 웬만하면 안 가는 게 나은 도박.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CANDIDATE 3 : 스프린트 (스플라인) ============ -->
+  <div class="stage">
+    <div class="thead"><span class="badge" style="background:#7f2a86">후보 3</span><h2>스프린트 서킷</h2><span class="motif">2 롱 스트레이트 · 하이스피드 스윕 · 타이트 헤어핀</span></div>
+    <svg id="c3" class="figure" viewBox="0 0 820 540" role="img" aria-label="후보 3 스프린트 서킷"></svg>
+    <div class="cols">
+      <div><h3 class="sec">특징</h3>
+        <table class="spec">
+          <tr><td>성격</td><td>위·아래 2개의 긴 직선 + 고속 스위퍼 + 좌측 타이트 헤어핀. 속도 편차 큼</td></tr>
+          <tr><td>추월</td><td>양 끝 직선 끝 브레이킹, 갈림길 2곳</td></tr>
+          <tr><td>기믹</td><td>신호등 · 과속방지턱 · 노면변화(헤어핀 지름길 입구, 젖음)</td></tr>
+          <tr><td>제작</td><td>중 — 직선 길고, 곡벽은 스위퍼·헤어핀</td></tr>
+        </table>
+      </div>
+      <div><h3 class="sec">지름길 손익 (갈까 말까?)</h3>
+        <table class="risk"><tr><th>갈림길</th><th>성공 이득</th><th>실패 손해</th><th>손익분기</th></tr>
+          <tr><td>① 우 고속 스윕</td><td class="gain">−1.5 s</td><td class="loss">+3.0 s</td><td class="be">67%</td></tr>
+          <tr><td>② 좌 헤어핀(젖음)</td><td class="gain">−0.6 s</td><td class="loss">+2.1 s</td><td class="be">78%</td></tr>
+        </table>
+        <p style="font-size:12.5px;color:var(--muted);margin-top:8px">고속 스윕①은 크게 벌지만 실패 시 −3초. 헤어핀②는 이득 작아 손익분기 78%.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <h3>지름길 「갈까 말까」 계산</h3>
+    <p>정점마다 <b>중앙 배리어</b> + 안쪽 <b>1대 폭 게이트</b>. 좁아서 잘 제어하면 이득, 삐끗하면 연석·스핀으로 큰 손해.</p>
+    <p>손익식: <code>기대이득 = p×(성공이득) − (1−p)×(실패손해)</code> · 0이 되는 <b>손익분기 성공률</b> <code>p* = 손해 ÷ (이득+손해)</code>.</p>
+    <p style="margin-bottom:0">모든 갈림길을 <b>p* ≈ 67~78%</b>로 맞춰 애매하게 두고, 일부 입구에 <b>노면변화(젖음)</b>를 겹쳐 실패 확률을 흔들어 계산을 더 어렵게 만들었어.</p>
+  </div>
+
+  <p class="foot-note">치수·손익 수치는 예시 스케일 — 실제 대관 홀 크기·차량 성능으로 재보정 필요 · 6/30 코스 설계 회의 기준 반영</p>
+
+</div>
+
+<script>
+function segsFor(P){
+  const n=P.length,S=[],a=0.5;
+  for(let i=0;i<n;i++){
+    const p0=P[(i-1+n)%n],p1=P[i],p2=P[(i+1)%n],p3=P[(i+2)%n];
+    const d=(u,v)=>Math.pow(Math.hypot(v[0]-u[0],v[1]-u[1]),a)||1e-6;
+    const t0=0,t1=d(p0,p1),t2=t1+d(p1,p2),t3=t2+d(p2,p3);
+    const m1=[(p2[0]-p1[0])/(t2-t1)-(p2[0]-p0[0])/(t2-t0)+(p1[0]-p0[0])/(t1-t0),
+              (p2[1]-p1[1])/(t2-t1)-(p2[1]-p0[1])/(t2-t0)+(p1[1]-p0[1])/(t1-t0)];
+    const m2=[(p3[0]-p2[0])/(t3-t2)-(p3[0]-p1[0])/(t3-t1)+(p2[0]-p1[0])/(t2-t1),
+              (p3[1]-p2[1])/(t3-t2)-(p3[1]-p1[1])/(t3-t1)+(p2[1]-p1[1])/(t2-t1)];
+    const dt=t2-t1;
+    S.push([p1,[p1[0]+m1[0]*dt/3,p1[1]+m1[1]*dt/3],[p2[0]-m2[0]*dt/3,p2[1]-m2[1]*dt/3],p2]);
+  }
+  return S;
+}
+const f1=v=>v.toFixed(1);
+function fullD(S){let d=`M${f1(S[0][0][0])},${f1(S[0][0][1])}`;for(const s of S)d+=`C${f1(s[1][0])},${f1(s[1][1])} ${f1(s[2][0])},${f1(s[2][1])} ${f1(s[3][0])},${f1(s[3][1])}`;return d;}
+function rangeD(S,list){const f=S[list[0]];let d=`M${f1(f[0][0])},${f1(f[0][1])}`;for(const i of list){const s=S[i];d+=`C${f1(s[1][0])},${f1(s[1][1])} ${f1(s[2][0])},${f1(s[2][1])} ${f1(s[3][0])},${f1(s[3][1])}`;}return d;}
+function frame(P,i){const n=P.length,a=P[(i-1+n)%n],b=P[(i+1)%n];let tx=b[0]-a[0],ty=b[1]-a[1];const L=Math.hypot(tx,ty)||1;tx/=L;ty/=L;return{p:P[i],t:[tx,ty],nx:[-ty,tx]};}
+function quad(cx,cy,t,nx,ht,hn,fill,extra){
+  const pt=(st,sn)=>`${f1(cx+t[0]*st+nx[0]*sn)},${f1(cy+t[1]*st+nx[1]*sn)}`;
+  return `<polygon points="${pt(ht,hn)} ${pt(ht,-hn)} ${pt(-ht,-hn)} ${pt(-ht,hn)}" fill="${fill}" ${extra||''}/>`;
+}
+function draw(id,cfg){
+  const P=cfg.points,S=segsFor(P);let g='';
+  const full=fullD(S);
+  g+=`<path d="${full}" fill="none" stroke="#d1362f" stroke-width="46" stroke-linejoin="round" stroke-linecap="round"/>`;
+  g+=`<path d="${full}" fill="none" stroke="#fff" stroke-width="46" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="13 13"/>`;
+  const scol={1:'#1d9e75',2:'#ef9f27',3:'#7f77dd'};
+  for(const sc of cfg.sectors)g+=`<path d="${rangeD(S,sc.list)}" fill="none" stroke="${scol[sc.k]}" stroke-width="34" stroke-linejoin="round" stroke-linecap="round"/>`;
+  for(const fk of cfg.forks){
+    const A=P[fk.a],B=P[fk.b],I=fk.inner;
+    const d=`M${A[0]},${A[1]} Q${I[0]},${I[1]} ${B[0]},${B[1]}`;
+    g+=`<path d="${d}" fill="none" stroke="#d1362f" stroke-width="21" stroke-linecap="round"/>`;
+    g+=`<path d="${d}" fill="none" stroke="#fff" stroke-width="21" stroke-linecap="round" stroke-dasharray="8 8"/>`;
+    g+=`<path d="${d}" fill="none" stroke="#6a6a63" stroke-width="13" stroke-linecap="round"/>`;
+    g+=`<path d="${d}" fill="none" stroke="#e8b53a" stroke-width="1.2" stroke-dasharray="5 6"/>`;
+    if(fk.wet){g+=`<circle cx="${(A[0]+I[0])/2}" cy="${(A[1]+I[1])/2}" r="17" fill="#8bbf4d" opacity="0.85"/>`;}
+    g+=`<rect x="${A[0]-8}" y="${A[1]-8}" width="16" height="16" fill="#111"/><rect x="${A[0]-5}" y="${A[1]-5}" width="5" height="5" fill="#fff"/>`;
+    const mx=(A[0]+2*I[0]+B[0])/4,my=(A[1]+2*I[1]+B[1])/4;
+    let tx=B[0]-A[0],ty=B[1]-A[1];const L=Math.hypot(tx,ty)||1;tx/=L;ty/=L;
+    g+=quad(mx,my,[tx,ty],[-ty,tx],8,4.5,'#2c3e50');
+    g+=`<text x="${I[0]}" y="${I[1]-14}" font-size="12" font-weight="700" fill="#8a5a08" text-anchor="middle">${fk.label}</text>`;
+  }
+  for(const sc of cfg.sectors){const fr=frame(P,sc.list[0]);
+    g+=`<circle cx="${fr.p[0]}" cy="${fr.p[1]}" r="9" fill="#fff" stroke="#1c1c1a"/><text x="${fr.p[0]}" y="${fr.p[1]+3.5}" font-size="10" font-weight="700" text-anchor="middle">${sc.b}</text>`;}
+  {const fr=frame(P,cfg.bump);g+=quad(fr.p[0],fr.p[1],fr.t,fr.nx,7,17,'#e8b53a');
+   for(let k=-2;k<=2;k++)g+=quad(fr.p[0]+fr.nx[0]*k*6,fr.p[1]+fr.nx[1]*k*6,fr.t,fr.nx,7,1.6,'#1c1c1a');}
+  {const fr=frame(P,cfg.car);for(const off of [-11,0,11]){const cx=fr.p[0]+fr.nx[0]*off,cy=fr.p[1]+fr.nx[1]*off;
+     g+=quad(cx,cy,fr.t,fr.nx,8,4.5,'#2c3e50');g+=quad(cx+fr.t[0]*4,cy+fr.t[1]*4,fr.t,fr.nx,2,4,'#8fb0cf');}}
+  {const fr=frame(P,cfg.start);const cells=6,span=34;
+   for(let k=0;k<cells;k++){const sn=-17+(k+0.5)*(span/cells);const cx=fr.p[0]+fr.nx[0]*sn,cy=fr.p[1]+fr.nx[1]*sn;
+     g+=quad(cx,cy,fr.t,fr.nx,4,(span/cells)/2,k%2?'#111':'#fff');}
+   const lx=fr.p[0]+fr.nx[0]*26,ly=fr.p[1]+fr.nx[1]*26;
+   g+=`<rect x="${lx-15}" y="${ly-6}" width="30" height="12" rx="3" fill="#222"/><circle cx="${lx-8}" cy="${ly}" r="3.2" fill="#e2413b"/><circle cx="${lx}" cy="${ly}" r="3.2" fill="#e8b53a"/><circle cx="${lx+8}" cy="${ly}" r="3.2" fill="#4bbd6b"/>`;
+   g+=`<text x="${fr.p[0]+fr.nx[0]*40}" y="${fr.p[1]+fr.nx[1]*40+4}" font-size="11" fill="#6a6a63" text-anchor="middle">출발/피니시</text>`;}
+  const C=[410,270];
+  for(const sc of cfg.sectors){const mid=sc.list[Math.floor(sc.list.length/2)];const fr=frame(P,mid);
+    let dx=C[0]-fr.p[0],dy=C[1]-fr.p[1];const L=Math.hypot(dx,dy)||1;dx/=L;dy/=L;
+    const chx=fr.p[0]+dx*42,chy=fr.p[1]+dy*42;const fill=scol[sc.k],tc=sc.k==1?'#04342c':sc.k==2?'#633806':'#26215c';
+    g+=`<g><rect x="${chx-33}" y="${chy-10}" width="66" height="20" rx="10" fill="${fill}"/><text x="${chx}" y="${chy+4}" font-size="12" font-weight="700" text-anchor="middle" fill="${tc}">섹터 ${sc.k}</text></g>`;}
+  document.getElementById(id).innerHTML=g;
+}
+draw('c2',{
+  points:[[410,95],[540,112],[642,168],[612,258],[698,320],[662,408],[532,452],[470,398],[360,455],[232,430],[150,352],[210,292],[138,214],[242,140],[338,178],[352,108]],
+  sectors:[{k:1,b:'3|1',list:[6,7,8,9,10]},{k:2,b:'1|2',list:[11,12,13,14,15]},{k:3,b:'2|3',list:[0,1,2,3,4,5]}],
+  start:8,car:8,bump:0,
+  forks:[{a:3,b:5,inner:[628,338],label:'갈림길 ①'},{a:12,b:14,inner:[250,200],label:'갈림길 ②',wet:true}]
+});
+draw('c3',{
+  points:[[300,100],[520,105],[622,150],[692,232],[700,330],[642,408],[498,452],[330,452],[205,412],[152,332],[210,268],[150,196],[228,138]],
+  sectors:[{k:1,b:'3|1',list:[0,1,2,3]},{k:2,b:'1|2',list:[4,5,6,7]},{k:3,b:'2|3',list:[8,9,10,11,12]}],
+  start:7,car:7,bump:0,
+  forks:[{a:3,b:5,inner:[648,318],label:'갈림길 ①'},{a:10,b:12,inner:[212,178],label:'갈림길 ②',wet:true}]
+});
+</script>
+</body>
+</html>
