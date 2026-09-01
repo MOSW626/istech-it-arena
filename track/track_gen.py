@@ -686,21 +686,37 @@ def decimate_by_arclength(arr, step, closed=True):
     return arr[idxs]
 
 
-def build_ribbon_boxes(points_xy_th, width, closed=True, overlap=1.15):
-    """Turn a decimated polyline into a chain of oriented boxes (for SDF/rasterization)."""
-    boxes = []
+def build_ribbon_boxes(points_xy_th, width, closed=True, overlap=1.15, mitre=False):
+    """Turn a decimated polyline into a chain of oriented boxes (for SDF/rasterization).
+
+    mitre=True extends each box by (w/2)*tan(dyaw/2) at both ends. A plain chord
+    rectangle's OUTER edge only spans R/(R+w/2) of the angle it has to cover on a
+    turn of radius R -- at the 0.30 m-radius corners of a 0.45 m wide track that
+    is 57%, and the missing 43% showed up as triangular holes in the road surface
+    (issue #13). The mitre makes consecutive outer edges meet exactly.
+
+    It is OFF by default because the same extension pushes the box's INNER edge
+    across the turn: harmless for the road surface (it only laps into its own
+    grass), but on the wall ring it ate up to 11.7 mm of the designed 0.45 m
+    driving width. Walls/grass keep the plain chord chain."""
     n = len(points_xy_th)
-    rng = range(n) if closed else range(n - 1)
-    for i in rng:
-        p0 = points_xy_th[i]
-        p1 = points_xy_th[(i + 1) % n]
-        cx, cy = (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0
+    segs = []
+    for i in (range(n) if closed else range(n - 1)):
+        p0, p1 = points_xy_th[i], points_xy_th[(i + 1) % n]
         L = math.hypot(p1[0] - p0[0], p1[1] - p0[1])
         if L < 1e-6:
             continue
-        yaw = math.atan2(p1[1] - p0[1], p1[0] - p0[0])
+        segs.append((i, (p0[0] + p1[0]) / 2.0, (p0[1] + p1[1]) / 2.0,
+                     math.atan2(p1[1] - p0[1], p1[0] - p0[0]), L))
+    m = len(segs)
+    boxes = []
+    for k, (i, cx, cy, yaw, L) in enumerate(segs):
         w = width[i] if np.ndim(width) else width
-        boxes.append(dict(x=cx, y=cy, yaw=yaw, length=L * overlap, width=w))
+        prev_yaw = segs[k - 1][3] if (closed or k > 0) else yaw
+        next_yaw = segs[(k + 1) % m][3] if (closed or k + 1 < m) else yaw
+        dmax = max(abs(wrap_heading(yaw - prev_yaw)), abs(wrap_heading(next_yaw - yaw)))
+        ext = min((w / 2.0) * math.tan(min(dmax, 2.0) / 2.0), L) if mitre else 0.0
+        boxes.append(dict(x=cx, y=cy, yaw=yaw, length=L * overlap + 2.0 * ext, width=w))
     return boxes
 
 
@@ -717,125 +733,19 @@ def box_corners(b):
 # BRANCH ("갈림길"/지름길) mouth handling.
 #
 # A branch shares its two endpoints with the main centerline -- they are
-# literally the same point in space (anchors). Its ribbon therefore overlaps
-# the main ribbon in a small "mouth" region around each anchor. Approach:
+# literally the same point in space (anchors), so its ribbon overlaps the main
+# ribbon in a small "mouth" region around each anchor.
 #
 #   1. DRIVABLE SURFACE (occupancy grid / SDF / preview fill): paint the main
 #      surface and every branch surface as independent box chains. Since all
 #      "surface_*" boxes are simply rasterized/rendered as free space without
 #      erasing each other, the overlap at the mouth is automatically the
-#      union drivable_union = main_ribbon UNION branch_ribbon -- no boolean
-#      geometry library needed for this part.
-#   2. WALLS / GRASS: for each branch and each of its two anchors, walk along
-#      the branch outward from that anchor and find how far it stays within
-#      "gap_margin" of the main centerline (gap_margin sized so it covers the
-#      main track + grass corridor plus half the branch width, i.e. the
-#      widest either ribbon could reach). That gives a short main-arc-length
-#      window (on the side the branch departs on) where a wall/grass strip
-#      would otherwise cut straight across the branch mouth -- we omit
-#      wall/grass boxes there. Symmetrically, we omit the BRANCH's own
-#      wall over the matching stretch of its own arc-length near that
-#      anchor (its wall only starts once it has visibly separated from the
-#      main ribbon). The two walls then line up into one continuous
-#      boundary around the drivable union, open exactly at the two mouths.
+#      union drivable_union = main_ribbon UNION branch_ribbon.
+#   2. WALLS / GRASS: both are derived from the shapely corridor/drivable
+#      union polygons instead (build_union_wall_boxes /
+#      build_union_grass_boxes), so they follow the true outline of that same
+#      union and stay continuous around a mouth with nothing to cut.
 # ---------------------------------------------------------------------------
-def _reversed_with_relative_s(arr):
-    """Reverse a (N,4) [x,y,th,s] array and re-zero its s column so index 0
-    is the (former) last point with s=0 -- i.e. re-express arc length as
-    "distance from the far end" instead of "distance from the near end"."""
-    total = float(arr[-1, 3])
-    rev = arr[::-1].copy()
-    rev[:, 3] = total - rev[:, 3]
-    return rev
-
-
-def compute_branch_mouth_extent(main_arr, branch_pts_ordered, gap_margin):
-    """Walk branch_pts_ordered (rows of a branch's (N,4) array, ordered
-    OUTWARD starting from one anchor) and find how far the branch stays
-    within gap_margin of the main centerline. Returns None if not even the
-    anchor point itself is within gap_margin (shouldn't normally happen,
-    since the anchor sits exactly ON the main line), otherwise a dict with:
-      main_s_lo, main_s_hi : the affected MAIN arc-length window (wraps mod Ltot)
-      side                 : 'left' or 'right' (which side of the main line)
-      branch_s_reach       : how far (in the branch's own arc length, from
-                              the anchor this ordering starts at) the overlap
-                              extends -- i.e. the branch's own wall should
-                              start only after this distance.
-    """
-    Ltot = float(main_arr[-1, 3])
-    s_vals = []
-    side_votes = {}
-    branch_s_reach = 0.0
-    for p in branch_pts_ordered:
-        s_main, d = nearest_s(main_arr, (p[0], p[1]))
-        if d >= gap_margin:
-            break
-        mx, my, mth = sample_at_s(main_arr, s_main, Ltot)
-        nx, ny = -math.sin(mth), math.cos(mth)
-        side = "left" if ((p[0] - mx) * nx + (p[1] - my) * ny) >= 0 else "right"
-        s_vals.append(s_main)
-        side_votes[side] = side_votes.get(side, 0) + 1
-        branch_s_reach = float(p[3])
-    if not s_vals:
-        return None
-    side = max(side_votes, key=side_votes.get)
-    # unwrap the collected main-s values relative to the first one so a run
-    # that happens to straddle the s=0/Ltot seam doesn't come out inverted
-    unwrapped = [s_vals[0]]
-    for s in s_vals[1:]:
-        d = s - unwrapped[-1]
-        d = (d + Ltot / 2.0) % Ltot - Ltot / 2.0
-        unwrapped.append(unwrapped[-1] + d)
-    lo, hi = min(unwrapped), max(unwrapped)
-    pad = 0.05
-    return dict(main_s_lo=(lo - pad) % Ltot, main_s_hi=(hi + pad) % Ltot,
-                side=side, branch_s_reach=branch_s_reach + pad)
-
-
-def build_ribbon_boxes_with_gaps(points_xy_th_s, width, gaps_s, closed=True, overlap=1.15):
-    """Like build_ribbon_boxes, but splits the chain wherever a point's arc
-    length s falls inside one of the gaps_s = [(s_lo, s_hi), ...] windows
-    (each window may wrap through 0, i.e. s_lo > s_hi means "s >= s_lo OR
-    s <= s_hi"), and does not bridge a box across a gap. This is what
-    actually cuts an opening into the main track's wall/grass chain (or a
-    branch's own wall chain) at a branch mouth."""
-    n = len(points_xy_th_s)
-    if n == 0:
-        return []
-    width_is_arr = bool(np.ndim(width))
-
-    def in_gap(s):
-        for lo, hi in gaps_s:
-            if lo <= hi:
-                if lo <= s <= hi:
-                    return True
-            else:
-                if s >= lo or s <= hi:
-                    return True
-        return False
-
-    keep = [not in_gap(float(points_xy_th_s[i][3])) for i in range(n)]
-    idxs = list(range(n)) + ([0] if closed else [])
-
-    boxes = []
-    cur_pts, cur_w = [], []
-
-    def flush():
-        if len(cur_pts) >= 2:
-            w = np.array(cur_w) if width_is_arr else width
-            boxes.extend(build_ribbon_boxes(np.array(cur_pts), w, closed=False, overlap=overlap))
-
-    for idx in idxs:
-        j = idx % n
-        if keep[j]:
-            cur_pts.append(points_xy_th_s[j])
-            if width_is_arr:
-                cur_w.append(width[j])
-        else:
-            flush()
-            cur_pts, cur_w = [], []
-    flush()
-    return boxes
 
 
 # ---------------------------------------------------------------------------
@@ -1212,7 +1122,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
 # ---------------------------------------------------------------------------
 # Verification checks
 # ---------------------------------------------------------------------------
-def run_checks(res):
+def run_checks(res, boxes=None):
     arr = res["arr"]
     meta = res["meta"]
     track_w = meta["track_w"]
@@ -1410,6 +1320,46 @@ def run_checks(res):
         results["branches"] = []
         results["branches_ok"] = True
 
+    # 9. box-chain coverage (design v4 only): the SDF/raster boxes must actually
+    # tile the designed drivable area and the grass band around it -- this is
+    # what caught issue #13's triangular holes on the 0.30 m-radius corners.
+    if branches and boxes:
+        try:
+            from shapely.geometry import Polygon as _CovPoly
+            from shapely.ops import unary_union as _cov_union
+            drivable = build_corridor_polygon(arr, res["tw_arr"], branches, sc, grass_w=0.0)
+            corridor = build_corridor_polygon(arr, res["tw_arr"], branches, sc)
+            grass_region = corridor.difference(drivable)
+
+            def _u(prefix):
+                return _cov_union([_CovPoly(box_corners(b)) for k, v in boxes.items()
+                                   if k.startswith(prefix) for b in v])
+
+            surf, grass, walls = _u("surface_"), _u("grass_"), _u("walls_")
+            # a wall box that laps onto the road steals from the regulation
+            # 0.45 m width -- 0.20 m 갈림길 vs a 0.15 m car leaves 2.5 cm a side.
+            wall_on_road = sum(p.area for p in getattr(walls.intersection(drivable), "geoms",
+                                                       [walls.intersection(drivable)])
+                               if p.geom_type == "Polygon")
+            results["wall_on_road_cm2"] = round(1e4 * wall_on_road, 2)
+            results["wall_on_road_ok"] = bool(results["wall_on_road_cm2"] < 5.0)
+            miss = drivable.difference(surf)
+            import shapely as _sh
+            results["surface_missing_pct"] = round(100 * miss.area / drivable.area, 4)
+            results["surface_max_gap_m"] = round(
+                _sh.maximum_inscribed_circle(miss).length if not miss.is_empty else 0.0, 4)
+            results["surface_coverage_ok"] = bool(results["surface_missing_pct"] < 0.1
+                                                  and results["surface_max_gap_m"] < 0.01)
+            results["grass_missing_pct"] = round(
+                100 * grass_region.difference(grass).area / grass_region.area, 4)
+            results["grass_on_road_pct"] = round(
+                100 * grass.intersection(drivable).area / drivable.area, 4)
+            results["grass_coverage_ok"] = bool(results["grass_missing_pct"] < 1.0
+                                                and results["grass_on_road_pct"] < 0.5)
+        except Exception as e:
+            results["surface_coverage_ok"] = f"check skipped: {e}"
+            results["grass_coverage_ok"] = f"check skipped: {e}"
+
     return results
 
 
@@ -1488,7 +1438,49 @@ def build_union_wall_boxes(res, wall_step):
     return boxes
 
 
-def build_geometry_boxes(res, wall_step=0.14, surface_step=0.35):
+def build_union_grass_boxes(res, step):
+    """Design-mode grass: fill (corridor - drivable) with a box ribbon laid along
+    the drivable boundary, each box only as wide as the grass band actually is
+    there. Replaces the gap-cut left/right grass ribbons, which left the whole
+    area around a 갈림길 mouth bare ground (issue #13). Islands too small to
+    survive a GRASS_W/2 erosion keep a bare middle -- a few cm2, not worth a
+    medial-axis fill.
+    ponytail: band width quantised to GRASS_W/8 by containment sampling."""
+    import shapely
+    from shapely.geometry.polygon import orient
+    meta = res["meta"]
+    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"])
+    drivable = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"],
+                                       grass_w=0.0)
+    grass = corridor.difference(drivable)
+    # orient(+1) => exterior CCW, holes CW => the right-hand normal always
+    # points OUT of the drivable area, i.e. into the grass band.
+    drivable = orient(drivable, 1.0)
+    nslab = 8
+    slab_t = GRASS_W * (np.arange(nslab) + 0.5) / nslab
+    boxes = []
+    for ring in [drivable.exterior, *drivable.interiors]:
+        rs = resample_by_arclength([(p[0], p[1]) for p in ring.coords], step, closed=True)
+        rarr, _ = _arr_from_resampled(rs, closed=True)
+        nx, ny = np.sin(rarr[:, 2]), -np.cos(rarr[:, 2])
+        tx, ty = np.cos(rarr[:, 2]), np.sin(rarr[:, 2])
+        # a slab counts only if the box's whole footprint fits (probe the two
+        # tangential ends too) -- around a 갈림길 mouth the band tapers to a
+        # point and a normal-only probe would let a box straddle the road.
+        inside = np.ones((len(rarr), nslab), dtype=bool)
+        for off in (-step / 2.0, 0.0, step / 2.0):
+            inside &= shapely.contains_xy(
+                grass, rarr[:, 0:1] + tx[:, None] * off + nx[:, None] * slab_t,
+                       rarr[:, 1:2] + ty[:, None] * off + ny[:, None] * slab_t)
+        k = np.argmin(np.c_[inside, np.zeros(len(rarr), dtype=bool)], axis=1)
+        w = GRASS_W * k / nslab
+        pts = np.column_stack([rarr[:, 0] + nx * w / 2.0, rarr[:, 1] + ny * w / 2.0,
+                               rarr[:, 2], rarr[:, 3]])
+        boxes += [b for b in build_ribbon_boxes(pts, w, closed=True) if b["width"] > 0.01]
+    return boxes
+
+
+def build_geometry_boxes(res, wall_step=0.14, surface_step=0.08, grass_step=0.04):
     """Precompute wall / track-surface / grass / fork box chains shared by
     SDF, DXF and map raster."""
     meta = res["meta"]
@@ -1496,8 +1488,6 @@ def build_geometry_boxes(res, wall_step=0.14, surface_step=0.35):
     arr = res["arr"]
 
     out = {}
-    tw_dec_idx = np.searchsorted(arr[:, 3], decimate_by_arclength(arr, wall_step)[:, 3])
-    tw_dec_idx = np.clip(tw_dec_idx, 0, len(arr) - 1)
 
     def dec_with_width(a, w_full, step, closed=True):
         s = a[:, 3]
@@ -1514,7 +1504,7 @@ def build_geometry_boxes(res, wall_step=0.14, surface_step=0.35):
     rw_dec, _ = dec_with_width(rw, res["tw_arr"], wall_step)
 
     dec, tw_d = dec_with_width(arr, res["tw_arr"], surface_step)
-    out["surface_main"] = build_ribbon_boxes(dec, tw_d, closed=True)
+    out["surface_main"] = build_ribbon_boxes(dec, tw_d, closed=True, mitre=True)
 
     lg = offset_polyline(arr, res["tw_arr"] / 2 + res["gh_arr"] / 2)
     rg = offset_polyline(arr, -(res["tw_arr"] / 2 + res["gh_arr"] / 2))
@@ -1523,41 +1513,22 @@ def build_geometry_boxes(res, wall_step=0.14, surface_step=0.35):
 
     branches = res.get("branches") or []
     if branches:
-        # find, per branch and per anchor, the main-arc-length window (and
-        # side) that must be left open in the main wall/grass, and the
-        # matching branch-local window where the branch's OWN wall must stay
-        # open (see the big comment above compute_branch_mouth_extent).
-        gaps_left, gaps_right = [], []
-        for br in branches:
-            gap_margin = meta["track_w"] / 2.0 + GRASS_W + br["width_m"] / 2.0 + 0.03
-            start_info = compute_branch_mouth_extent(arr, br["arr"], gap_margin)
-            end_info = compute_branch_mouth_extent(arr, _reversed_with_relative_s(br["arr"]), gap_margin)
-            if start_info:
-                (gaps_left if start_info["side"] == "left" else gaps_right).append(
-                    (start_info["main_s_lo"], start_info["main_s_hi"]))
-            if end_info:
-                (gaps_left if end_info["side"] == "left" else gaps_right).append(
-                    (end_info["main_s_lo"], end_info["main_s_hi"]))
-
+        # Walls AND grass both come from the corridor/drivable union polygons,
+        # so they line up around every 갈림길 mouth by construction. The
+        # "_left" keys carry the whole union chain; "_right" stays empty so the
+        # downstream key lists (SDF / map / DXF / preview) keep working.
         out["walls_main_left"] = build_union_wall_boxes(res, wall_step)
         out["walls_main_right"] = []
-        out["grass_main_left"] = build_ribbon_boxes_with_gaps(lg_dec, gh_d_l, gaps_left, closed=True)
-        out["grass_main_right"] = build_ribbon_boxes_with_gaps(rg_dec, gh_d_r, gaps_right, closed=True)
+        out["grass_main_left"] = build_union_grass_boxes(res, grass_step)
+        out["grass_main_right"] = []
 
         for i, br in enumerate(branches):
             key = f"branch{i}"
-            barr = br["arr"]
-            bw = br["width_m"]
             out[f"walls_{key}_left"] = []
             out[f"walls_{key}_right"] = []
             out[f"surface_{key}"] = build_ribbon_boxes(
-                decimate_by_arclength(barr, surface_step, closed=False), bw, closed=False)
-            # A branch's own grass buffer is intentionally skipped: it is a
-            # single-car-width shortcut running right alongside the main
-            # route, and adding a second layer of grass gap-cutting on top
-            # of the wall gap-cutting above would meaningfully complicate the
-            # mouth geometry for a purely cosmetic strip. The main track's
-            # grass still gets cut at the mouths (right above).
+                decimate_by_arclength(br["arr"], surface_step, closed=False),
+                br["width_m"], closed=False, mitre=True)
     else:
         out["walls_main_left"] = build_ribbon_boxes(lw_dec, wt, closed=False)
         out["walls_main_right"] = build_ribbon_boxes(rw_dec, wt, closed=False)
@@ -1574,7 +1545,7 @@ def build_geometry_boxes(res, wall_step=0.14, surface_step=0.35):
         out[f"walls_{key}_right"] = build_ribbon_boxes(decimate_by_arclength(frw, wall_step, closed=False),
                                                          wt, closed=False)
         out[f"surface_{key}"] = build_ribbon_boxes(decimate_by_arclength(farr, surface_step, closed=False),
-                                                      fork_w, closed=False)
+                                                      fork_w, closed=False, mitre=True)
         fg_l = offset_polyline(farr, fork_w / 2 + GRASS_W * meta["scale"] * 0.15)
         fg_r = offset_polyline(farr, -(fork_w / 2 + GRASS_W * meta["scale"] * 0.15))
         out[f"grass_{key}_left"] = build_ribbon_boxes(decimate_by_arclength(fg_l, surface_step, closed=False),
@@ -1620,6 +1591,15 @@ def write_map(res, boxes, outdir, resolution):
     branch_surface_keys = tuple(f"surface_branch{i}" for i in range(len(branches)))
     branch_wall_keys = tuple(f"walls_branch{i}_{side}" for i in range(len(branches)) for side in ("left", "right"))
 
+    # Draw order is grass -> surface -> walls, so that wherever a grass box
+    # laps over the road edge the road still wins (it does in the real world
+    # too: the surface sits 1 mm proud of the grass).
+    grass_keys = ("grass_main_left", "grass_main_right", "grass_fork1_left", "grass_fork1_right",
+                  "grass_fork2_left", "grass_fork2_right")
+    for key in grass_keys:
+        fill_boxes(canvas_plain, boxes.get(key, []), 254)
+        fill_boxes(canvas_grass, boxes.get(key, []), 150)
+
     # NOTE: surface boxes are simply OR'd together (later fillPoly calls don't
     # erase earlier ones) -- this is exactly how the main route and every
     # branch route end up as one drivable_union of free space, with no
@@ -1628,12 +1608,6 @@ def write_map(res, boxes, outdir, resolution):
     for key in surface_keys:
         fill_boxes(canvas_plain, boxes.get(key, []), 254)
         fill_boxes(canvas_grass, boxes.get(key, []), 254)
-
-    grass_keys = ("grass_main_left", "grass_main_right", "grass_fork1_left", "grass_fork1_right",
-                  "grass_fork2_left", "grass_fork2_right")
-    for key in grass_keys:
-        fill_boxes(canvas_plain, boxes.get(key, []), 254)
-        fill_boxes(canvas_grass, boxes.get(key, []), 150)
 
     wall_keys = ("walls_main_left", "walls_main_right", "walls_fork1_left", "walls_fork1_right",
                  "walls_fork2_left", "walls_fork2_right") + branch_wall_keys
@@ -2267,8 +2241,25 @@ def render_preview(res, boxes, outdir, checks):
         pts = np.concatenate([left[:, :2], right[::-1, :2]], axis=0)
         ax.add_patch(Polygon(pts, closed=True, facecolor=color, edgecolor="none", alpha=alpha, zorder=z))
 
-    ribbon_poly(res["left_grass_out"], res["left_b"], "#7CCB6E", 1.0, 2)
-    ribbon_poly(res["right_b"], res["right_grass_out"], "#7CCB6E", 1.0, 2)
+    if branches:
+        # design v4: grass is the corridor minus the drivable union (same
+        # polygons build_union_grass_boxes boxes up), so the preview shows the
+        # 갈림길 surroundings as grass too.
+        from matplotlib.path import Path
+        from matplotlib.patches import PathPatch
+        corr = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"])
+        drv = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"], grass_w=0.0)
+        gpoly = corr.difference(drv)
+        verts, codes = [], []
+        for g in (gpoly.geoms if gpoly.geom_type == "MultiPolygon" else [gpoly]):
+            for ring in [g.exterior, *g.interiors]:
+                c = list(ring.coords)
+                verts += c
+                codes += [Path.MOVETO] + [Path.LINETO] * (len(c) - 2) + [Path.CLOSEPOLY]
+        ax.add_patch(PathPatch(Path(verts, codes), facecolor="#7CCB6E", edgecolor="none", zorder=2))
+    else:
+        ribbon_poly(res["left_grass_out"], res["left_b"], "#7CCB6E", 1.0, 2)
+        ribbon_poly(res["right_b"], res["right_grass_out"], "#7CCB6E", 1.0, 2)
     ribbon_poly(res["left_b"], res["right_b"], "#555555", 1.0, 3)
     if has_forks:
         ribbon_poly(res["fork1_left"], res["fork1_right"], "#C77DFF", 0.9, 3)
@@ -2523,7 +2514,7 @@ def main():
     write_traffic_light_controller(outdir)
 
     print("[track_gen] running verification checks ...")
-    checks = run_checks(res)
+    checks = run_checks(res, boxes)
 
     print("[track_gen] writing scene.json ...")
     write_scene_json(res, outdir, checks)

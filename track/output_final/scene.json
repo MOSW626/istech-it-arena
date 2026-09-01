@@ -4383,6 +4383,14 @@
         "ok": true
       }
     ],
-    "branches_ok": true
+    "branches_ok": true,
+    "wall_on_road_cm2": 1.44,
+    "wall_on_road_ok": true,
+    "surface_missing_pct": 0.0538,
+    "surface_max_gap_m": 0.001,
+    "surface_coverage_ok": true,
+    "grass_missing_pct": 0.2311,
+    "grass_on_road_pct": 0.1305,
+    "grass_coverage_ok": true
   }
 }
