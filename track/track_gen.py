@@ -47,7 +47,7 @@ NARROW_TAPER_LEN = 0.35          # linear taper in/out on each side
 FRICTION_ZONE_LEN = 1.5          # 노면변화 patch length
 GRASS_W = 0.20
 WALL_T = 0.05
-WALL_H = 0.30
+WALL_H = 0.40                    # 2026-09-14 회의 확정 (0.30 → 0.40, ArUco 갠트리 높이와 정렬)
 MIN_RADIUS = 0.45
 CHICANE_MIN_RADIUS = 0.30         # exception for the 직각 시케인 only
 CLEARANCE_MIN = 0.35
@@ -56,7 +56,8 @@ BUMP_SPACING = 0.6
 BUMP_PRESETS = {"low": 0.005, "mid": 0.010, "high": 0.015}
 ARUCO_DICT = "DICT_4X4_50"
 ARUCO_SIZE = 0.10
-ARUCO_MOUNT_H = 0.05             # bottom height of marker on wall
+ARUCO_MOUNT_H = 0.05             # bottom height of marker on wall (내장 코스 전용)
+ARUCO_GANTRY_CENTER_H = 0.40     # 2026-09-14 회의 확정: 마커 중심 높이 (도로 중앙 갠트리식)
 FORK_WIDTH = 0.35                 # alternate-route width
 
 GRID_EXT = 2.0                    # extension of the pre-start straight (m)
@@ -522,60 +523,30 @@ def build_grid_zone_slots(arr, Ltot, s0, s1, cars):
     return slots, stagger
 
 
-def _wall_plate(ring, t, toward):
-    """Marker plate lying flat on the wall at arc-position t of a corridor
-    boundary ring, facing `toward` (a point on the track). Returns
-    (x, y, yaw, footprint_polygon)."""
-    from shapely.geometry import Polygon
-    size, thick = ARUCO_SIZE, 0.005
-    p = ring.interpolate(t)
-    a, b = ring.interpolate(t - size / 2.0), ring.interpolate(t + size / 2.0)
-    ux, uy = b.x - a.x, b.y - a.y
-    n = math.hypot(ux, uy) or 1.0
-    ux, uy = ux / n, uy / n
-    nx, ny = -uy, ux
-    if nx * (toward.x - p.x) + ny * (toward.y - p.y) < 0.0:
-        nx, ny = -nx, -ny
-    corners = [(p.x + ux * size / 2 + nx * thick / 2, p.y + uy * size / 2 + ny * thick / 2),
-               (p.x - ux * size / 2 + nx * thick / 2, p.y - uy * size / 2 + ny * thick / 2),
-               (p.x - ux * size / 2 - nx * thick / 2, p.y - uy * size / 2 - ny * thick / 2),
-               (p.x + ux * size / 2 - nx * thick / 2, p.y + uy * size / 2 - ny * thick / 2)]
-    return float(p.x), float(p.y), math.atan2(ny, nx), Polygon(corners)
+def markers_from_design(arr, Ltot, aruco_list):
+    """Gantry-mounted markers (2026-09-14 회의 확정).
 
+    The marker hangs over the **middle of the road** like a highway overhead
+    sign: its centre sits ARUCO_GANTRY_CENTER_H above the ground -- level with
+    the top of the 0.40 m walls the mount spans -- and it faces straight back
+    down the track so an approaching car sees it head-on.
 
-def markers_from_design(arr, Ltot, aruco_list, track_width_at, grass_half_at, corridor, drivable):
-    """Markers are mounted flat ON the wall, per the README: take the intended
-    position (s + side offset), snap it to the nearest point of the corridor
-    boundary -- which is exactly the wall's inner face -- and lay the plate
-    along that wall. Where the snap lands on a wall corner (the 갈림길 mouths)
-    a flush plate would still cut across the lane, so slide along the wall to
-    the closest spot whose footprint stays out of the drivable area."""
-    from shapely.geometry import Point
-    rings = [corridor.exterior] + list(corridor.interiors)
+    This replaces the old flush-on-the-wall placement, which was only
+    detectable at 0.75~1.2 m (issue #12).  The mounting bracket itself is not
+    modelled; see track/README.md §3 for the build note.
+    """
     markers = []
     for m in aruco_list:
         s = float(m["s"]) % Ltot
-        side = 1.0 if m.get("side", "left") == "left" else -1.0
         x, y, th = sample_at_s(arr, s, Ltot)
-        off = side * (track_width_at(s) / 2.0 + grass_half_at(s) * 0.4 + 0.05)
-        want = Point(x - math.sin(th) * off, y + math.cos(th) * off)
-        ring = min(rings, key=lambda r: r.distance(want))
-        t0 = ring.project(want)
-        plate = None
-        for k in range(51):
-            for t in ([t0] if k == 0 else [t0 - k * 0.02, t0 + k * 0.02]):
-                cand = _wall_plate(ring, t % ring.length, Point(x, y))
-                if cand[3].intersection(drivable).area < 1e-9:
-                    plate = cand
-                    break
-            if plate:
-                break
-        mx, my, yaw, _ = plate or _wall_plate(ring, t0, Point(x, y))
+        facing = th + math.pi                      # normal points at oncoming traffic
         mid = int(m["id"])
         fake = bool(m.get("fake", False))
         role = ("fake" if fake else REAL_IDS.get(mid, "custom"))
-        markers.append(dict(id=mid, real=(not fake), role=role, x=float(mx), y=float(my),
-                             z=ARUCO_MOUNT_H, yaw=float(yaw), s=float(s), note=m.get("note", "")))
+        markers.append(dict(id=mid, real=(not fake), role=role, x=float(x), y=float(y),
+                             z=ARUCO_GANTRY_CENTER_H - ARUCO_SIZE / 2.0,
+                             yaw=float(math.atan2(math.sin(facing), math.cos(facing))),
+                             s=float(s), note=m.get("note", "")))
     return markers
 
 
@@ -1080,8 +1051,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
 
     corridor = build_corridor_polygon(arr, tw_arr, branches)
     drivable = build_corridor_polygon(arr, tw_arr, branches, grass_w=0.0)
-    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [], track_width_at,
-                                   grass_half_at, corridor, drivable)
+    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [])
 
     min_r_general = compute_min_radius(arr, closed)
 
@@ -1889,7 +1859,8 @@ def write_dxf(res, boxes, outdir):
     for m in res["markers"]:
         s = ARUCO_SIZE * meta["scale"]
         msp.add_circle((m["x"], m["y"]), radius=s / 2, dxfattribs={"layer": "MARKERS"})
-        label = f"ID{m['id']}" + ("" if m["real"] else "(FAKE)")
+        label = (f"ID{m['id']}" + ("" if m["real"] else "(FAKE)")
+                  + f" h={m['z'] + ARUCO_SIZE * meta['scale'] / 2.0:.2f}m")
         msp.add_text(label, height=0.10 * meta["scale"],
                       dxfattribs={"layer": "MARKERS"}).set_placement((m["x"] + 0.1, m["y"] + 0.1))
 
@@ -2094,12 +2065,18 @@ def write_scene_json(res, outdir, checks):
         },
         "aruco_markers": {
             "dictionary": ARUCO_DICT, "marker_size_m": ARUCO_SIZE * meta["scale"],
-            "mount_bottom_height_m": ARUCO_MOUNT_H * meta["scale"],
+            "mount_bottom_height_m": (round(res["markers"][0]["z"], 4) if res["markers"]
+                                       else ARUCO_MOUNT_H * meta["scale"]),
+            "mount_center_height_m": (round(res["markers"][0]["z"] + ARUCO_SIZE * meta["scale"] / 2.0, 4)
+                                       if res["markers"] else None),
+            "mounting": ("갠트리식 — 도로 중앙 상공에 설치, 접근 차량을 정면으로 향함 (2026-09-14 회의 확정)"
+                          if res["markers"] and abs(res["markers"][0]["z"] - (ARUCO_GANTRY_CENTER_H - ARUCO_SIZE / 2.0)) < 1e-9
+                          else "벽면 부착"),
             "markers": [
                 {"id": m["id"], "real": m["real"], "role": m.get("role", "fake"),
                  "pose": {"x": round(m["x"], 4), "y": round(m["y"], 4), "z": round(m["z"], 4),
                            "yaw_rad": round(m["yaw"], 4)},
-                 "normal_note": "yaw points along the marker's outward-facing normal, toward the track",
+                 "normal_note": "yaw points along the marker's outward-facing normal (the direction the face looks)",
                  "s_m": (round(m["s"], 3) if m["s"] is not None else None),
                  "note": m.get("note", "")}
                 for m in res["markers"]
