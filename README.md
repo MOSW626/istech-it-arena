@@ -13,12 +13,25 @@
 
 | 찾는 것 | 위치 |
 |---|---|
-| 대회 규칙 · 일정 · 지원 물품 | [**MANUAL.md**](MANUAL.md) |
-| 트랙 맵 파일 (시뮬레이터 · 시공용) | [**track/**](track/) — 사용법은 [track/README.md](track/README.md) |
+| 대회 규칙 · 일정 · 패널티 · 예산 | [**MANUAL.md**](MANUAL.md) |
+| **PDB(전원 모듈) 사양 · 데이터시트** | [**docs/hardware/power-modules.md**](docs/hardware/power-modules.md) |
+| 트랙 맵 파일 (시뮬레이터 · 시공용) | [**track/**](track/) — 사용법과 **ArUco 검출 주의사항**은 [track/README.md](track/README.md) |
 | 파일 통째로 다운로드 | [**Releases**](../../releases) 에서 zip — 항상 최신 릴리즈를 받으세요 |
 | 질문 · 파일 문제 제보 · 규칙 제안 | [**Issues**](../../issues) — 아래 "이슈 사용법" 참고 |
 | 회의 기록 | [**meetings/**](meetings/) |
 | GitHub이 처음이라면 | [**docs/github-guide.md**](docs/github-guide.md) |
+
+### 🔧 차 만들기 전에 꼭 볼 것
+
+처음 오셨거나 이제 부품을 주문하신다면 이 네 가지만 먼저 보세요.
+
+1. **[전원 모듈(PDB) 사양](docs/hardware/power-modules.md)** — 지급되는 보드 2장은 역할이 다릅니다.
+   입출력이 전부 **XT-30 암 커넥터**라 케이블은 각 팀이 준비해야 하고,
+   보드가 **10 × 14 cm × 2장**이라 차체 바닥을 거의 다 씁니다.
+2. **[예산 집계 방식](MANUAL.md)** — 3만원 이상 물품 합산 30만원. 모터·센서류는 금액과 무관하게 포함.
+3. **[ArUco 검출 주의사항](track/README.md)** — OpenCV 기본 설정으로는 멀쩡한 마커를 놓칩니다.
+   마커 크기도 **판 10 cm / 코드 7 cm**로 다릅니다.
+4. **[원격 비상정지 요건](MANUAL.md)** — 의무 장비입니다. 하드웨어·소프트웨어 스위치 각 1개 이상.
 
 ## 이슈(Issues) 사용법
 
