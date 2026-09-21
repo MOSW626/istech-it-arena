@@ -55,6 +55,10 @@ venv/bin/python3 track_gen.py --design design_final.json --outdir output_final
 
 **진짜 4개뿐이며, 가짜(디코이) 마커는 없습니다.**
 
+> ⚠️ **차량 식별 마커에 ArUco를 쓰신다면 아래 네 ID는 피하세요.** 같은 `DICT_4X4_50`으로
+> 차량 마커를 만들면 코스 표지판과 구분되지 않습니다. 생성기와 규정은
+> [MANUAL.md §5](../MANUAL.md)와 [`tools/make_vehicle_marker.py`](../tools/make_vehicle_marker.py) 참고.
+
 | ID | 위치 (s) | 역할 |
 |---|---|---|
 | 0 | 0.00 | 출발/결승선 (랩 타이밍 기준) |
@@ -210,6 +214,9 @@ OpenCV ArUco 기본값 0.05에서는 **정상 검출돼야 할 마커가 누락�
 
 ## 변경 이력
 
+- **2026-09-22**: 문서 추가 — 차량 식별 마커가 코스 ArUco와 ID를 공유하지 못하도록 §3에 주의를
+  넣고 [`tools/make_vehicle_marker.py`](../tools/make_vehicle_marker.py)를 추가. 산출물 파일은
+  변경 없음. (이슈 #1)
 - **2026-09-15**: 문서 정정 — ArUco 크기를 **판 10 cm / 코드 7 cm**로 구분 표기하고, 검출 참고(§3.1)
   추가. 산출물 파일은 변경 없음. (이슈 #12, ISAAC 제보)
 - **2026-09-14**: 세부 규칙 확정 회의 반영 — **벽 높이 0.30 → 0.40 m**,

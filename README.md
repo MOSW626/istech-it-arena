@@ -32,6 +32,9 @@
 3. **[ArUco 검출 주의사항](track/README.md)** — OpenCV 기본 설정으로는 멀쩡한 마커를 놓칩니다.
    마커 크기도 **판 10 cm / 코드 7 cm**로 다릅니다.
 4. **[원격 비상정지 요건](MANUAL.md)** — 의무 장비입니다. 하드웨어·소프트웨어 스위치 각 1개 이상.
+5. **[차량 식별 마커](MANUAL.md)** — 5 × 5 cm, 차량 뒷면, **미부착 시 출전 금지**.
+   ArUco로 만드신다면 [`tools/make_vehicle_marker.py`](tools/make_vehicle_marker.py)가
+   예약 ID를 막고 검출까지 검증해 줍니다. 정한 ID는 [이슈 #1](../../issues/1)에 남겨주세요.
 
 ## 이슈(Issues) 사용법
 
