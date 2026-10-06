@@ -1,80 +1,171 @@
 #!/usr/bin/env python3
 """
-traffic_light.py -- simulator-agnostic race-start traffic light controller
-for the ISTech IT Arena track.
+traffic_light.py -- race-start light controller for the ISTech IT Arena track.
 
-Broadcasts the light state as JSON over UDP broadcast on port 47810, so any
-team's stack (F1TENTH gym, ROS 2 node, a bare Python client, Gazebo bridge,
-...) can subscribe without depending on a specific simulator's message type.
+Implements the start sequence confirmed at the 2026-09-14 meeting (R1-5 / R2-5):
 
-Sequence (matches a standard F1-style start):
-    RED          3.0 s
-    RED + YELLOW 1.0 s
-    GREEN        (race on, held until stopped / re-armed)
+    F1 style. Several single-colour LEDs light up one at a time, and the race
+    starts the moment they ALL GO OUT. The Arduino randomises the lighting
+    speed, so the sequence takes a different amount of time every race.
 
-Wire format (UDP, JSON, one packet per state change and one heartbeat/0.2s):
-    {"t": <unix_time_s>, "state": "red"|"red_yellow"|"green",
-     "red": bool, "yellow": bool, "green": bool, "seq": <int>}
+    armed  -> all off
+    lighting -> 1, 2, ... N lights on, one step at a time
+    hold   -> all N on, held
+    go     -> ALL OFF == RACE ON
 
---- Hooking this into Gazebo (Gazebo Sim / gz) ---
-This script does NOT talk to Gazebo directly (kept simulator-neutral). If you
-want the lamp_red / lamp_yellow / lamp_green links in world.sdf to actually
-light up, run a small bridge that listens on this UDP socket and toggles the
-material's <emissive> via the transport service, e.g.:
+>>> THE START EVENT IS LIGHTS GOING OUT, NOT A GREEN LIGHT TURNING ON. <<<
 
-    gz service -s /world/it_arena_track/state ...  # or
-    gz topic -t /world/it_arena_track/visual_config -m gz.msgs.Visual -p '...'
+An earlier version of this file broadcast a road-traffic signal
+(red -> red+yellow -> green) with fixed 3.0 s / 1.0 s timing. That was wrong on
+both counts: the real start is signalled by lights going OUT, and the timing is
+random. If you built a detector against that version, it will not work on race
+day. Rebuild it against this contract.
 
-or, in ROS 2 + ros_gz, remap the state to a `std_msgs/ColorRGBA` topic and use
-an `ignition::gazebo::systems::UserCommands` / material-switch plugin. Because
-exact topic names depend on your Gazebo version, wire this up on the
-integration side; this script only guarantees the UDP JSON contract above.
+--- Numbers are PLACEHOLDERS ---
+The structure above is decided. The exact LED count and the random ranges come
+from Pinocchio and are tracked in issue #3; they will be dropped in here when
+they arrive (issue #5). Do NOT tune your detector to these specific numbers --
+make it work for any N and any interval inside a plausible range.
+
+    lights        5
+    step interval 0.6 .. 1.4 s   (randomised per race)
+    hold          0.2 .. 3.0 s   (randomised per race)
+
+Wire format (UDP broadcast, JSON, one packet per change + heartbeat every 0.2 s):
+
+    {"t": <unix_s>, "seq": <int>, "schema": 2,
+     "state": "armed" | "lighting" | "hold" | "go",
+     "lights_total": <int>, "lights_on": <int>,
+     "go": <bool>, "green": <bool>}
+
+`go` is the field to act on. `green` carries the same value purely so older
+clients fail loudly rather than silently: the `red` and `yellow` fields are gone
+because the real signal has no colours to tell apart -- every LED is the same
+colour and you must COUNT them, not classify them.
+
+In the real race there is no UDP at all. Start detection must be visual.
+This script exists so you can exercise that logic in simulation.
+
+Usage:
+    python3 traffic_light.py                 # broadcast, repeating
+    python3 traffic_light.py --once          # one sequence, then exit
+    python3 traffic_light.py --seed 42       # reproducible randomisation
+    python3 traffic_light.py --selftest      # run checks, no socket
 """
 import argparse
 import json
+import random
 import socket
+import sys
 import time
 
 UDP_PORT = 47810
+N_LIGHTS = 5
+STEP_RANGE = (0.6, 1.4)
+HOLD_RANGE = (0.2, 3.0)
+HEARTBEAT = 0.2
 
 
-def broadcast_loop(port=UDP_PORT, host="255.255.255.255", loop=True):
+def plan_sequence(rng, n_lights=N_LIGHTS, step_range=STEP_RANGE, hold_range=HOLD_RANGE):
+    """One race worth of timing. Returns (step_s, hold_s).
+
+    The Arduino randomises the lighting speed, so a single step interval is
+    drawn per race and used for every light -- the lights come on evenly, but
+    at a pace you cannot know in advance.
+    """
+    step = rng.uniform(*step_range)
+    hold = rng.uniform(*hold_range)
+    return step, hold
+
+
+def iter_states(step, hold, n_lights=N_LIGHTS):
+    """The sequence as (state, lights_on, duration) triples. Pure, so testable."""
+    yield ("armed", 0, step)
+    for k in range(1, n_lights + 1):
+        yield ("lighting", k, step)
+    yield ("hold", n_lights, hold)
+    yield ("go", 0, None)          # None == hold until stopped / re-armed
+
+
+def broadcast_loop(port=UDP_PORT, host="255.255.255.255", loop=True, seed=None,
+                   n_lights=N_LIGHTS, green_hold=20.0):
+    rng = random.Random(seed)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     seq = 0
 
-    def send(state, red, yellow, green):
+    def send(state, lights_on):
         nonlocal seq
         seq += 1
-        payload = json.dumps({"t": time.time(), "state": state, "red": red,
-                               "yellow": yellow, "green": green, "seq": seq}).encode()
-        sock.sendto(payload, (host, port))
+        go = (state == "go")
+        sock.sendto(json.dumps({
+            "t": time.time(), "seq": seq, "schema": 2, "state": state,
+            "lights_total": n_lights, "lights_on": lights_on,
+            "go": go, "green": go,
+        }).encode(), (host, port))
 
-    def hold(state, red, yellow, green, duration):
-        t_end = time.time() + duration
-        while time.time() < t_end:
-            send(state, red, yellow, green)
-            time.sleep(0.2)
-
-    print(f"[traffic_light] broadcasting UDP JSON on port {port} ...")
+    print("[traffic_light] broadcasting UDP JSON on port %d" % port)
+    print("[traffic_light] START EVENT = ALL LIGHTS OUT (not a green light)")
     while True:
-        print("[traffic_light] RED")
-        hold("red", True, False, False, 3.0)
-        print("[traffic_light] RED+YELLOW")
-        hold("red_yellow", True, True, False, 1.0)
-        print("[traffic_light] GREEN - go!")
-        t_end = time.time() + 3600 if loop else time.time() + 5
-        while time.time() < t_end:
-            send("green", False, False, True)
-            time.sleep(0.2)
+        step, hold = plan_sequence(rng, n_lights=n_lights)
+        print("[traffic_light] this race: step %.2fs, hold %.2fs" % (step, hold))
+        for state, lights_on, duration in iter_states(step, hold, n_lights):
+            if state == "go":
+                print("[traffic_light] LIGHTS OUT -- GO")
+            elif state == "lighting":
+                print("[traffic_light] light %d/%d on" % (lights_on, n_lights))
+            t_end = time.time() + (green_hold if duration is None else duration)
+            while time.time() < t_end:
+                send(state, lights_on)
+                time.sleep(HEARTBEAT)
         if not loop:
             break
 
 
+def selftest():
+    rng = random.Random(0)
+    step, hold = plan_sequence(rng)
+    states = list(iter_states(step, hold))
+
+    # lights come on one at a time, 0 .. N, then all go out together
+    counts = [c for _, c, _ in states]
+    assert counts == list(range(N_LIGHTS + 1)) + [N_LIGHTS, 0], counts
+    assert states[-1][0] == "go" and states[-1][1] == 0, "start must be lights-out"
+    assert states[-2][0] == "hold" and states[-2][1] == N_LIGHTS, "hold must be fully lit"
+
+    # go is reached exactly once, and only after every light is on
+    assert [s for s, _, _ in states].count("go") == 1
+    first_full = next(i for i, (_, c, _) in enumerate(states) if c == N_LIGHTS)
+    assert first_full < len(states) - 1
+
+    # timing is randomised per race, and inside the declared ranges
+    draws = [plan_sequence(random.Random(s)) for s in range(50)]
+    assert len({round(a, 6) for a, _ in draws}) > 1, "step interval must vary between races"
+    assert len({round(b, 6) for _, b in draws}) > 1, "hold must vary between races"
+    assert all(STEP_RANGE[0] <= a <= STEP_RANGE[1] for a, _ in draws)
+    assert all(HOLD_RANGE[0] <= b <= HOLD_RANGE[1] for _, b in draws)
+
+    # a fixed seed reproduces a race exactly
+    assert plan_sequence(random.Random(7)) == plan_sequence(random.Random(7))
+
+    total = sum(d for _, _, d in states if d is not None)
+    assert STEP_RANGE[0] * (N_LIGHTS + 1) + HOLD_RANGE[0] <= total <=            STEP_RANGE[1] * (N_LIGHTS + 1) + HOLD_RANGE[1]
+
+    print("selftest OK -- %d lights, lights-out start, step %.2fs hold %.2fs (total %.2fs)"
+          % (N_LIGHTS, step, hold, total))
+
+
 if __name__ == "__main__":
-    ap = argparse.ArgumentParser(description=__doc__)
+    ap = argparse.ArgumentParser(description="ISTech IT Arena race-start lights")
     ap.add_argument("--port", type=int, default=UDP_PORT)
     ap.add_argument("--host", default="255.255.255.255", help="UDP target (broadcast by default)")
-    ap.add_argument("--once", action="store_true", help="run one red->green sequence and exit")
+    ap.add_argument("--once", action="store_true", help="run one sequence and exit")
+    ap.add_argument("--seed", type=int, default=None, help="reproducible randomisation")
+    ap.add_argument("--lights", type=int, default=N_LIGHTS, help="LED count (see issue #3)")
+    ap.add_argument("--selftest", action="store_true", help="run checks without a socket")
     args = ap.parse_args()
-    broadcast_loop(port=args.port, host=args.host, loop=not args.once)
+    if args.selftest:
+        selftest()
+        sys.exit(0)
+    broadcast_loop(port=args.port, host=args.host, loop=not args.once,
+                   seed=args.seed, n_lights=args.lights)
