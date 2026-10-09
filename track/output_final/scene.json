@@ -4254,7 +4254,9 @@
     "gantry_height_m": 1.2,
     "lamps": [
       "red",
-      "yellow",
+      "red",
+      "red",
+      "red",
       "green"
     ],
     "udp_port": 47810

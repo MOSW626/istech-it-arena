@@ -555,7 +555,7 @@ def traffic_light_from_design(arr, Ltot, tl, track_width_at):
     x, y, th = sample_at_s(arr, s, Ltot)
     tw = track_width_at(s)
     return dict(x=float(x), y=float(y), yaw=float(th), width=float(tw), gantry_height=1.2,
-                lamps=["red", "yellow", "green"], side=tl.get("side", "left"), s=float(s))
+                lamps=["red", "red", "red", "red", "green"], side=tl.get("side", "left"), s=float(s))
 
 
 def get_friction_zones(res):
@@ -842,7 +842,7 @@ def build_all(scale=1.0, resolution=0.01, bump_height=0.010, grid_cars=6, outdir
     # ---- traffic light gantry at start/finish ----
     tlx, tly, tlth = sample_at_s(arr, 0.0, Ltot)
     traffic_light = dict(x=float(tlx), y=float(tly), yaw=float(tlth), width=track_w0,
-                          gantry_height=1.2 * sc, lamps=["red", "yellow", "green"])
+                          gantry_height=1.2 * sc, lamps=["red", "red", "red", "red", "green"])
 
     # ---- starting grid: grid_cars in 2 staggered columns, before s=0 ----
     n_cols = 2
@@ -1721,10 +1721,15 @@ def write_sdf(res, boxes, outdir):
                                 0.06 * meta["scale"], 0.06 * meta["scale"], post_h, "0.2 0.2 0.2 1"))
     links.append(_sdf_box_link("tl_beam", tl["x"], tl["y"], gh, yaw,
                                 beam_len, 0.06 * meta["scale"], 0.06 * meta["scale"], "0.2 0.2 0.2 1"))
-    lamp_r = 0.045 * meta["scale"]
-    lamp_colors = {"lamp_red": "1 0 0 1", "lamp_yellow": "1 1 0 1", "lamp_green": "0 1 0 1"}
-    lamp_offsets = [-0.15, 0.0, 0.15]
-    for (name, rgba), doff in zip(lamp_colors.items(), lamp_offsets):
+    # Real unit (Pinocchio, issue #3 2026-10-09): 5 sets left-to-right
+    # RED RED RED RED GREEN, each emitting face ~15 mm across, 15 mm apart.
+    lamp_r = 0.0075 * meta["scale"]          # 15 mm emitting face
+    lamp_pitch = 0.030 * meta["scale"]       # 15 mm face + 15 mm gap
+    lamp_spec = [("lamp_red_1", "1 0 0 1"), ("lamp_red_2", "1 0 0 1"),
+                 ("lamp_red_3", "1 0 0 1"), ("lamp_red_4", "1 0 0 1"),
+                 ("lamp_green", "0 1 0 1")]
+    lamp_offsets = [(i - 2) * lamp_pitch / meta["scale"] for i in range(5)]
+    for (name, rgba), doff in zip(lamp_spec, lamp_offsets):
         lx = tl["x"] + math.cos(yaw) * doff * meta["scale"]
         ly = tl["y"] + math.sin(yaw) * doff * meta["scale"]
         links.append(f"""
@@ -2089,67 +2094,64 @@ def write_scene_json(res, outdir, checks):
     return scene
 
 
-def write_traffic_light_controller(outdir, n_lights=5, step_range=(0.6, 1.4), hold_range=(0.2, 3.0)):
-    content = TRAFFIC_LIGHT_TEMPLATE.replace("@N_LIGHTS@", str(int(n_lights))) \
-        .replace("@STEP_MIN@", repr(float(step_range[0]))).replace("@STEP_MAX@", repr(float(step_range[1]))) \
-        .replace("@HOLD_MIN@", repr(float(hold_range[0]))).replace("@HOLD_MAX@", repr(float(hold_range[1])))
+def write_traffic_light_controller(outdir):
     with open(os.path.join(outdir, "traffic_light.py"), "w") as f:
-        f.write(content)
+        f.write(TRAFFIC_LIGHT_TEMPLATE)
 
 
 TRAFFIC_LIGHT_TEMPLATE = '''#!/usr/bin/env python3
 """
 traffic_light.py -- race-start light controller for the ISTech IT Arena track.
 
-Implements the start sequence confirmed at the 2026-09-14 meeting (R1-5 / R2-5):
+Mirrors the ACTUAL start light built by Pinocchio (spec + Arduino source posted
+to issue #3 on 2026-10-09). The timings below are not placeholders any more --
+they are the delays in the real sketch.
 
-    F1 style. Several single-colour LEDs light up one at a time, and the race
-    starts the moment they ALL GO OUT. The Arduino randomises the lighting
-    speed, so the sequence takes a different amount of time every race.
+Hardware
+    5 light sets in a row, left to right:  RED RED RED RED GREEN
+    Each set is two diffused sources 5 mm apart vertically (4x 5mm LEDs behind
+    a diffuser), emitting face ~15 mm across, sets spaced 15 mm apart.
+    Relay-switched, 4x 1.5 V cells. randomSeed comes from A0 pin noise, so
+    every race differs.
 
-    armed  -> all off
-    lighting -> 1, 2, ... N lights on, one step at a time
-    hold   -> all N on, held
-    go     -> ALL OFF == RACE ON
+Sequence (exactly the Arduino runStartingSequence())
+    all off                 1.000 s
+    red 1 on                1.000 s
+    red 2 on                1.000 s
+    red 3 on                random 1.000 .. 3.000 s
+    red 4 on                random 1.000 .. 3.000 s
+    reds OFF + GREEN ON  == RACE ON    (green holds 5 s, then all off)
 
->>> THE START EVENT IS LIGHTS GOING OUT, NOT A GREEN LIGHT TURNING ON. <<<
+    Total 5.00 .. 9.00 s, mean 7.00 s.
 
-An earlier version of this file broadcast a road-traffic signal
-(red -> red+yellow -> green) with fixed 3.0 s / 1.0 s timing. That was wrong on
-both counts: the real start is signalled by lights going OUT, and the timing is
-random. If you built a detector against that version, it will not work on race
-day. Rebuild it against this contract.
+>>> THE START IS: ALL FOUR REDS GO OUT AND THE GREEN COMES ON, TOGETHER. <<<
 
---- Numbers are PLACEHOLDERS ---
-The structure above is decided. The exact LED count and the random ranges come
-from Pinocchio and are tracked in issue #3; they will be dropped in here when
-they arrive (issue #5). Do NOT tune your detector to these specific numbers --
-make it work for any N and any interval inside a plausible range.
+Both edges happen in the same instant, so you may trigger on either one.
+What you cannot do is predict when. The 3rd and 4th reds each hold for a random
+1-3 s, so the gap before the start is never the same twice.
 
-    lights        @N_LIGHTS@
-    step interval @STEP_MIN@ .. @STEP_MAX@ s   (randomised per race)
-    hold          @HOLD_MIN@ .. @HOLD_MAX@ s   (randomised per race)
+--- If you built against an earlier version, read this ---
+  v2026.10.06 modelled a single-colour F1 bar where the start was ALL lights
+  going out and every interval was randomised. The real light is not single
+  colour, the green does come on, and the first two steps are fixed at 1 s.
+  Before that the script was a road signal (red -> red+yellow -> green) on
+  fixed 3.0 s / 1.0 s timing, with no randomness at all.
 
-Wire format (UDP broadcast, JSON, one packet per change + heartbeat every 0.2 s):
+Wire format (UDP broadcast, JSON, on change + heartbeat every 0.2 s)
 
-    {"t": <unix_s>, "seq": <int>, "schema": 2,
-     "state": "armed" | "lighting" | "hold" | "go",
-     "lights_total": <int>, "lights_on": <int>,
-     "go": <bool>, "green": <bool>}
+    {"t": <unix_s>, "seq": <int>, "schema": 3,
+     "state": "armed" | "red1" | "red2" | "red3" | "red4" | "go" | "off",
+     "reds": [bool, bool, bool, bool], "reds_on": <0..4>,
+     "green": <bool>, "go": <bool>}
 
-`go` is the field to act on. `green` carries the same value purely so older
-clients fail loudly rather than silently: the `red` and `yellow` fields are gone
-because the real signal has no colours to tell apart -- every LED is the same
-colour and you must COUNT them, not classify them.
+In the real race there is no UDP. Start detection must be visual; this exists
+so you can exercise that logic in simulation.
 
-In the real race there is no UDP at all. Start detection must be visual.
-This script exists so you can exercise that logic in simulation.
-
-Usage:
+Usage
     python3 traffic_light.py                 # broadcast, repeating
-    python3 traffic_light.py --once          # one sequence, then exit
-    python3 traffic_light.py --seed 42       # reproducible randomisation
-    python3 traffic_light.py --selftest      # run checks, no socket
+    python3 traffic_light.py --once
+    python3 traffic_light.py --seed 42       # reproducible
+    python3 traffic_light.py --selftest      # checks, no socket
 """
 import argparse
 import json
@@ -2159,116 +2161,111 @@ import sys
 import time
 
 UDP_PORT = 47810
-N_LIGHTS = @N_LIGHTS@
-STEP_RANGE = (@STEP_MIN@, @STEP_MAX@)
-HOLD_RANGE = (@HOLD_MIN@, @HOLD_MAX@)
+N_RED = 4
+ARM_S = 1.0                      # turnOffAllLights(); delay(1000)
+FIXED_STEP_S = 1.0               # delay(1000) after red 1 and red 2
+RANDOM_STEP_MS = (1000, 3000)    # Arduino random(1000, 3001), inclusive ms
+GREEN_HOLD_S = 5.0               # delay(5000) before turnOffAllLights()
 HEARTBEAT = 0.2
 
 
-def plan_sequence(rng, n_lights=N_LIGHTS, step_range=STEP_RANGE, hold_range=HOLD_RANGE):
-    """One race worth of timing. Returns (step_s, hold_s).
-
-    The Arduino randomises the lighting speed, so a single step interval is
-    drawn per race and used for every light -- the lights come on evenly, but
-    at a pace you cannot know in advance.
-    """
-    step = rng.uniform(*step_range)
-    hold = rng.uniform(*hold_range)
-    return step, hold
+def plan_sequence(rng):
+    """The two random delays for this race, in seconds. Drawn as integer
+    milliseconds exactly like the Arduino random(1000, 3001)."""
+    return (rng.randint(*RANDOM_STEP_MS) / 1000.0,
+            rng.randint(*RANDOM_STEP_MS) / 1000.0)
 
 
-def iter_states(step, hold, n_lights=N_LIGHTS):
-    """The sequence as (state, lights_on, duration) triples. Pure, so testable."""
-    yield ("armed", 0, step)
-    for k in range(1, n_lights + 1):
-        yield ("lighting", k, step)
-    yield ("hold", n_lights, hold)
-    yield ("go", 0, None)          # None == hold until stopped / re-armed
+def iter_states(d3, d4):
+    """(state, reds_on, green, duration). Pure, so it can be tested."""
+    yield ("armed", 0, False, ARM_S)
+    yield ("red1", 1, False, FIXED_STEP_S)
+    yield ("red2", 2, False, FIXED_STEP_S)
+    yield ("red3", 3, False, d3)
+    yield ("red4", 4, False, d4)
+    yield ("go", 0, True, GREEN_HOLD_S)
+    yield ("off", 0, False, None)
 
 
 def broadcast_loop(port=UDP_PORT, host="255.255.255.255", loop=True, seed=None,
-                   n_lights=N_LIGHTS, green_hold=20.0):
+                   idle_s=3.0):
     rng = random.Random(seed)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     seq = 0
 
-    def send(state, lights_on):
+    def send(state, reds_on, green):
         nonlocal seq
         seq += 1
-        go = (state == "go")
         sock.sendto(json.dumps({
-            "t": time.time(), "seq": seq, "schema": 2, "state": state,
-            "lights_total": n_lights, "lights_on": lights_on,
-            "go": go, "green": go,
+            "t": time.time(), "seq": seq, "schema": 3, "state": state,
+            "reds": [i < reds_on for i in range(N_RED)], "reds_on": reds_on,
+            "green": green, "go": (state == "go"),
         }).encode(), (host, port))
 
     print("[traffic_light] broadcasting UDP JSON on port %d" % port)
-    print("[traffic_light] START EVENT = ALL LIGHTS OUT (not a green light)")
+    print("[traffic_light] START = four reds go out and the green comes on")
     while True:
-        step, hold = plan_sequence(rng, n_lights=n_lights)
-        print("[traffic_light] this race: step %.2fs, hold %.2fs" % (step, hold))
-        for state, lights_on, duration in iter_states(step, hold, n_lights):
+        d3, d4 = plan_sequence(rng)
+        print("[traffic_light] this race: red3 holds %.3fs, red4 holds %.3fs "
+              "(start at T+%.3fs)" % (d3, d4, ARM_S + 2 * FIXED_STEP_S + d3 + d4))
+        for state, reds_on, green, duration in iter_states(d3, d4):
             if state == "go":
-                print("[traffic_light] LIGHTS OUT -- GO")
-            elif state == "lighting":
-                print("[traffic_light] light %d/%d on" % (lights_on, n_lights))
-            t_end = time.time() + (green_hold if duration is None else duration)
+                print("[traffic_light] GREEN -- GO")
+            elif state.startswith("red"):
+                print("[traffic_light] red %d/%d on" % (reds_on, N_RED))
+            t_end = time.time() + (idle_s if duration is None else duration)
             while time.time() < t_end:
-                send(state, lights_on)
+                send(state, reds_on, green)
                 time.sleep(HEARTBEAT)
         if not loop:
             break
 
 
 def selftest():
-    rng = random.Random(0)
-    step, hold = plan_sequence(rng)
-    states = list(iter_states(step, hold))
+    d3, d4 = plan_sequence(random.Random(0))
+    st = list(iter_states(d3, d4))
 
-    # lights come on one at a time, 0 .. N, then all go out together
-    counts = [c for _, c, _ in states]
-    assert counts == list(range(N_LIGHTS + 1)) + [N_LIGHTS, 0], counts
-    assert states[-1][0] == "go" and states[-1][1] == 0, "start must be lights-out"
-    assert states[-2][0] == "hold" and states[-2][1] == N_LIGHTS, "hold must be fully lit"
+    names = [s for s, _, _, _ in st]
+    assert names == ["armed", "red1", "red2", "red3", "red4", "go", "off"], names
 
-    # go is reached exactly once, and only after every light is on
-    assert [s for s, _, _ in states].count("go") == 1
-    first_full = next(i for i, (_, c, _) in enumerate(states) if c == N_LIGHTS)
-    assert first_full < len(states) - 1
+    # reds light one at a time, then all four drop at once
+    assert [r for _, r, _, _ in st] == [0, 1, 2, 3, 4, 0, 0]
+    # green is on only at go, and go happens only after all four reds
+    assert [g for _, _, g, _ in st] == [False] * 5 + [True, False]
+    go_i = names.index("go")
+    assert st[go_i - 1][1] == N_RED, "green must follow all four reds"
+    assert st[go_i][1] == 0, "reds must drop as the green comes on"
 
-    # timing is randomised per race, and inside the declared ranges
-    draws = [plan_sequence(random.Random(s)) for s in range(50)]
-    assert len({round(a, 6) for a, _ in draws}) > 1, "step interval must vary between races"
-    assert len({round(b, 6) for _, b in draws}) > 1, "hold must vary between races"
-    assert all(STEP_RANGE[0] <= a <= STEP_RANGE[1] for a, _ in draws)
-    assert all(HOLD_RANGE[0] <= b <= HOLD_RANGE[1] for _, b in draws)
-
-    # a fixed seed reproduces a race exactly
+    # the two fixed steps are fixed, the other two are random and in range
+    draws = [plan_sequence(random.Random(s)) for s in range(500)]
+    assert len({d for d, _ in draws}) > 1 and len({d for _, d in draws}) > 1
+    lo, hi = RANDOM_STEP_MS[0] / 1000.0, RANDOM_STEP_MS[1] / 1000.0
+    assert all(lo <= a <= hi and lo <= b <= hi for a, b in draws)
     assert plan_sequence(random.Random(7)) == plan_sequence(random.Random(7))
 
-    total = sum(d for _, _, d in states if d is not None)
-    assert STEP_RANGE[0] * (N_LIGHTS + 1) + HOLD_RANGE[0] <= total <= \
-           STEP_RANGE[1] * (N_LIGHTS + 1) + HOLD_RANGE[1]
+    # total start time matches the real sketch: 5.00 .. 9.00 s
+    base = ARM_S + 2 * FIXED_STEP_S
+    totals = [base + a + b for a, b in draws]
+    assert min(totals) >= 5.0 - 1e-9 and max(totals) <= 9.0 + 1e-9
+    assert 5.0 <= base + d3 + d4 <= 9.0
 
-    print("selftest OK -- %d lights, lights-out start, step %.2fs hold %.2fs (total %.2fs)"
-          % (N_LIGHTS, step, hold, total))
+    print("selftest OK -- 4 red + 1 green, start at T+%.3fs (range 5.00-9.00s)"
+          % (base + d3 + d4))
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="ISTech IT Arena race-start lights")
     ap.add_argument("--port", type=int, default=UDP_PORT)
-    ap.add_argument("--host", default="255.255.255.255", help="UDP target (broadcast by default)")
+    ap.add_argument("--host", default="255.255.255.255")
     ap.add_argument("--once", action="store_true", help="run one sequence and exit")
     ap.add_argument("--seed", type=int, default=None, help="reproducible randomisation")
-    ap.add_argument("--lights", type=int, default=N_LIGHTS, help="LED count (see issue #3)")
     ap.add_argument("--selftest", action="store_true", help="run checks without a socket")
     args = ap.parse_args()
     if args.selftest:
         selftest()
         sys.exit(0)
-    broadcast_loop(port=args.port, host=args.host, loop=not args.once,
-                   seed=args.seed, n_lights=args.lights)
+    broadcast_loop(port=args.port, host=args.host, loop=not args.once, seed=args.seed)
 '''
 
 

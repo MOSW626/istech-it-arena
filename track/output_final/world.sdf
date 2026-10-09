@@ -41539,45 +41539,73 @@
       </visual>
     </link>
 
-    <link name="lamp_red">
-      <pose>9.9658 6.3165 1.0800 0 0 0</pose>
-      <visual name="lamp_red_vis">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+    <link name="lamp_red_1">
+      <pose>9.9659 6.4065 1.0800 0 0 0</pose>
+      <visual name="lamp_red_1_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
           <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_red_col">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+      <collision name="lamp_red_1_col">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
       </collision>
     </link>
 
-    <link name="lamp_yellow">
-      <pose>9.9660 6.4665 1.0800 0 0 0</pose>
-      <visual name="lamp_yellow_vis">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+    <link name="lamp_red_2">
+      <pose>9.9660 6.4365 1.0800 0 0 0</pose>
+      <visual name="lamp_red_2_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
-          <ambient>1 1 0 1</ambient><diffuse>1 1 0 1</diffuse>
-          <emissive>1 1 0 1</emissive>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_yellow_col">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+      <collision name="lamp_red_2_col">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+      </collision>
+    </link>
+
+    <link name="lamp_red_3">
+      <pose>9.9660 6.4665 1.0800 0 0 0</pose>
+      <visual name="lamp_red_3_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+      <collision name="lamp_red_3_col">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+      </collision>
+    </link>
+
+    <link name="lamp_red_4">
+      <pose>9.9660 6.4965 1.0800 0 0 0</pose>
+      <visual name="lamp_red_4_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+      <collision name="lamp_red_4_col">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
       </collision>
     </link>
 
     <link name="lamp_green">
-      <pose>9.9662 6.6165 1.0800 0 0 0</pose>
+      <pose>9.9661 6.5265 1.0800 0 0 0</pose>
       <visual name="lamp_green_vis">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse>
           <emissive>0 1 0 1</emissive>
         </material>
       </visual>
       <collision name="lamp_green_col">
-        <geometry><sphere><radius>0.0450</radius></sphere></geometry>
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
       </collision>
     </link>
 
