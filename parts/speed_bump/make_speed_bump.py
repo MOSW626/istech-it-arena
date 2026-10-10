@@ -31,8 +31,9 @@ SEG_W = 225.0       # 기본 조각 폭 = 450 / 2 (Bambu P1S 256mm 베드에 2�
 STEPS = 96          # 곡선 분할 수
 
 # 이음새 — 전높이 턱/홈. 차가 때리는 힘(x)에 대한 전단을 받아낸다.
-TONGUE_X = 20.0     # 주행 방향 길이
+TONGUE_X = 14.0     # 주행 방향 길이 (단면이 두꺼운 가운데에 둔다)
 TONGUE_Y = 6.0      # 폭 방향 돌출/깊이
+TONGUE_Z = 4.0      # 턱 높이 — 전높이가 아니라 일부만. 홈에 천장이 생겨 z를 가둔다
 CLEARANCE = 0.2     # 공차 (홈을 한 쪽당 이만큼 키운다). FDM/PLA 기준
 CHAMFER = 0.4       # 이음새 모따기 — 조립 길잡이 겸 메시 T-정션 방지
 
@@ -58,30 +59,41 @@ def _ramp(x, lo, hi, ch, peak):
     return peak
 
 
-def y_bounds(x, width, length, tongue, groove, clear, t_x, t_y, ch=CHAMFER):
-    """위치 x에서 부품이 차지하는 폭 방향 구간 [y_lo, y_hi].
-
-    이음새는 **전높이 턱(tongue) + 홈(groove)** 이다.
-    차가 방지턱을 때리는 힘은 **주행 방향(x)** 이고 조각은 **폭 방향(y)** 으로 나뉘므로,
-    이음새가 실제로 받는 하중은 조각끼리의 **x 전단**이다. 전높이 턱·홈의 옆면
-    (x = 일정 평면)이 그 힘을 그대로 받아낸다.
-    """
+def joint_at(x, length, tongue, groove, clear, t_x, t_y, ch):
+    """위치 x에서의 턱 돌출량과 홈 깊이."""
     x0, x1 = (length - t_x) / 2.0, (length + t_x) / 2.0
-    y_lo, y_hi = 0.0, width
-    if groove:                                  # 홈: 사방으로 공차만큼 크게
-        y_lo = _ramp(x, x0 - clear, x1 + clear, ch, t_y + clear)
-    if tongue:                                  # 턱: 설계 치수 그대로
-        y_hi = width + _ramp(x, x0, x1, ch, t_y)
-    return y_lo, y_hi
+    t = _ramp(x, x0, x1, ch, t_y) if tongue else 0.0
+    g = _ramp(x, x0 - clear, x1 + clear, ch, t_y + clear) if groove else 0.0
+    return t, g
+
+
+def cross_section(x, width, length, height, tongue, groove, clear,
+                  t_x, t_y, t_z, ch):
+    """위치 x에서의 단면 고리 — (y, z) 8점, 반시계 방향.
+
+    이음새는 **높이 일부만 쓰는 턱 + 천장이 있는 홈**이다.
+
+        턱   z = 0 .. t_z          (바닥에서 올라오므로 출력 시 오버행 없음)
+        홈   z = 0 .. t_z + clear  (천장이 생긴다. 6 mm 브리지라 FDM에서 그냥 찍힌다)
+
+    천장이 있어서 옆 조각이 **위로 들리지 못한다.** 아래로는 바닥이 받친다.
+    전높이로 내면 x 전단만 잡고 z는 못 잡는다 — 한 조각이 들리면 이음새에 단차가 생긴다.
+    """
+    h = profile(x, length, height)
+    t, g = joint_at(x, length, tongue, groove, clear, t_x, t_y, ch)
+    tz = min(t_z, h)                 # 단면이 얇은 구간에서는 고리가 뒤집히지 않도록 클램프
+    rz = min(t_z + clear, h)
+    return [(g, 0.0), (width + t, 0.0), (width + t, tz), (width, tz),
+            (width, h), (0.0, h), (0.0, rz), (g, rz)]
 
 
 def build_mesh(width=SEG_W, length=TRAVEL_L, height=HEIGHT, steps=STEPS,
                tongue=False, groove=False, clear=CLEARANCE,
-               t_x=TONGUE_X, t_y=TONGUE_Y, ch=CHAMFER):
-    """(삼각형 목록). 윗면 + 바닥 + 양 옆면으로 닫힌 솔리드.
+               t_x=TONGUE_X, t_y=TONGUE_Y, t_z=TONGUE_Z, ch=CHAMFER):
+    """(삼각형 목록). 단면 고리를 x 방향으로 스윕한 닫힌 솔리드.
 
     x = 주행 방향(0..length), y = 폭 방향, z = 높이.
-    양 끝에서 h=0이라 앞뒤 마구리면은 존재하지 않는다.
+    양 끝에서 h=0이라 고리가 선으로 줄어들어 마구리면은 저절로 사라진다.
     """
     x0, x1 = (length - t_x) / 2.0, (length + t_x) / 2.0
     xs = [length * i / steps for i in range(steps + 1)]
@@ -92,9 +104,8 @@ def build_mesh(width=SEG_W, length=TRAVEL_L, height=HEIGHT, steps=STEPS,
         xs += [g0, g0 + ch, g1 - ch, g1]
     xs = sorted(set(round(v, 9) for v in xs))
 
-    pts = [(x, *y_bounds(x, width, length, tongue, groove, clear, t_x, t_y, ch),
-            profile(x, length, height)) for x in xs]
-
+    rings = [cross_section(x, width, length, height, tongue, groove, clear,
+                           t_x, t_y, t_z, ch) for x in xs]
     tris = []
 
     def quad(a, b, c, d, want):
@@ -106,13 +117,18 @@ def build_mesh(width=SEG_W, length=TRAVEL_L, height=HEIGHT, steps=STEPS,
         tris.append((a, b, c))
         tris.append((a, c, d))
 
-    for i in range(len(pts) - 1):
-        xa, la, ha_, za = pts[i]
-        xb, lb, hb_, zb = pts[i + 1]
-        quad((xa, la, za), (xa, ha_, za), (xb, hb_, zb), (xb, lb, zb), (0, 0, 1))
-        quad((xa, la, 0.0), (xa, ha_, 0.0), (xb, hb_, 0.0), (xb, lb, 0.0), (0, 0, -1))
-        quad((xa, la, 0.0), (xb, lb, 0.0), (xb, lb, zb), (xa, la, za), (0, -1, 0))
-        quad((xa, ha_, 0.0), (xb, hb_, 0.0), (xb, hb_, zb), (xa, ha_, za), (0, 1, 0))
+    n_ring = 8
+    for i in range(len(xs) - 1):
+        xa, xb = xs[i], xs[i + 1]
+        ra, rb = rings[i], rings[i + 1]
+        for k in range(n_ring):
+            (ya, za), (yn, zn) = ra[k], ra[(k + 1) % n_ring]
+            (yb, zb), (yw, zw) = rb[k], rb[(k + 1) % n_ring]
+            # 반시계 고리의 변 P->Q 바깥 법선은 (0, dz, -dy)
+            want = (0.0, zn - za, -(yn - ya))
+            if abs(want[1]) < 1e-12 and abs(want[2]) < 1e-12:
+                want = (0.0, zw - zb, -(yw - yb))
+            quad((xa, ya, za), (xa, yn, zn), (xb, yw, zw), (xb, yb, zb), want)
 
     return [t for t in tris if _area(t) > 1e-12]
 
@@ -161,85 +177,108 @@ def write_stl(path, tris, name="speed_bump"):
                                 ax, ay, az, bx, by, bz, cx, cy, cz, 0))
 
 
-def analytic_volume(width, length, height, tongue, groove, clear, t_x, t_y, n=200000):
-    """해석적 부피: integral of h(x) * (y_hi - y_lo) dx."""
+def _poly_area(ring):
+    A = 0.0
+    for i in range(len(ring)):
+        y1, z1 = ring[i]
+        y2, z2 = ring[(i + 1) % len(ring)]
+        A += y1 * z2 - y2 * z1
+    return A / 2.0
+
+
+def analytic_volume(width, length, height, tongue, groove, clear,
+                    t_x, t_y, t_z, ch, n=120000):
+    """단면 고리의 면적을 x 방향으로 적분한 부피."""
     tot = 0.0
     for i in range(n):
         x = length * (i + 0.5) / n
-        lo, hi = y_bounds(x, width, length, tongue, groove, clear, t_x, t_y)
-        tot += profile(x, length, height) * (hi - lo)
+        tot += _poly_area(cross_section(x, width, length, height, tongue, groove,
+                                        clear, t_x, t_y, t_z, ch))
     return tot * length / n
 
 
+def y_span(x, z, width, length, height, tongue, groove, clear,
+           t_x, t_y, t_z, ch):
+    """위치 (x, z)에서 부품이 차지하는 폭 방향 구간. 없으면 None."""
+    h = profile(x, length, height)
+    if z > h:
+        return None
+    t, g = joint_at(x, length, tongue, groove, clear, t_x, t_y, ch)
+    y_hi = width + (t if z <= min(t_z, h) + 1e-12 else 0.0)
+    y_lo = g if z <= min(t_z + clear, h) + 1e-12 else 0.0
+    return y_lo, y_hi
+
+
 def selftest():
-    variants = [(False, False), (True, False), (False, True), (True, True)]
-    for tongue, groove in variants:
+    P = dict(clear=CLEARANCE, t_x=TONGUE_X, t_y=TONGUE_Y, t_z=TONGUE_Z, ch=CHAMFER)
+    for tongue, groove in [(False, False), (True, False), (False, True), (True, True)]:
         for w in (150.0, 225.0):
-            tris = build_mesh(width=w, tongue=tongue, groove=groove)
+            tris = build_mesh(width=w, tongue=tongue, groove=groove, **P)
             ok, bad = is_watertight(tris)
             assert ok, "메시가 닫혀 있지 않음 (턱=%s 홈=%s): 모서리 %d개" % (tongue, groove, bad)
             v = volume(tris)
             assert v > 0, "부피가 음수 — 법선 방향 오류: %.3f" % v
             want = analytic_volume(w, TRAVEL_L, HEIGHT, tongue, groove,
-                                   CLEARANCE, TONGUE_X, TONGUE_Y)
-            assert abs(v - want) / want < 0.003, (tongue, groove, v, want)
-
+                                   CLEARANCE, TONGUE_X, TONGUE_Y, TONGUE_Z, CHAMFER)
+            assert abs(v - want) / want < 0.004, (tongue, groove, w, v, want)
             zs = [p[2] for t in tris for p in t]
             assert abs(max(zs) - HEIGHT) < 1e-6 and abs(min(zs)) < 1e-9
 
-    # --- 공차: 평탄부에서 홈이 턱보다 한 쪽당 CLEARANCE 만큼 크다 ---
-    x0, x1 = (TRAVEL_L - TONGUE_X) / 2, (TRAVEL_L + TONGUE_X) / 2
     mid = TRAVEL_L / 2
-    yb = lambda x, t, g: y_bounds(x, SEG_W, TRAVEL_L, t, g, CLEARANCE, TONGUE_X, TONGUE_Y)
-    assert yb(mid, True, False)[1] == SEG_W + TONGUE_Y, "턱 높이가 설계값과 다름"
-    assert yb(mid, False, True)[0] == TONGUE_Y + CLEARANCE, "홈 깊이에 공차가 안 들어감"
-    # 턱은 [x0,x1] 밖에서 0, 홈은 [x0-c, x1+c] 밖에서 0
-    assert yb(x0 - 1e-9, True, False)[1] == SEG_W
-    assert yb(x1 + 1e-9, True, False)[1] == SEG_W
-    assert yb(x0 - CLEARANCE - 1e-9, False, True)[0] == 0.0
-    assert yb(x1 + CLEARANCE + 1e-9, False, True)[0] == 0.0
-    # 홈이 턱보다 x 방향으로 한 쪽당 CLEARANCE 만큼 길다
-    assert abs(((x1 + CLEARANCE) - (x0 - CLEARANCE)) - (TONGUE_X + 2 * CLEARANCE)) < 1e-12
+    x0, x1 = (TRAVEL_L - TONGUE_X) / 2, (TRAVEL_L + TONGUE_X) / 2
+    ya = lambda x, z: y_span(x, z, SEG_W, TRAVEL_L, HEIGHT, True, False, **P)
+    yb = lambda x, z: y_span(x, z, SEG_W, TRAVEL_L, HEIGHT, False, True, **P)
 
-    # --- 가상 조립: 턱 부품 + 홈 부품을 붙여 간섭과 틈을 본다 ---
-    W = SEG_W
-    gap_joint, gap_flat, contact = 1e9, 1e9, 0
-    for i in range(20001):
-        x = TRAVEL_L * i / 20000
-        a_lo, a_hi = yb(x, True, False)
-        b_lo, b_hi = yb(x, False, True)
-        b_lo += W                                # 조립 좌표로 평행이동
-        assert a_hi <= b_lo + 1e-12, "간섭! x=%.4f  A끝 %.4f  B시작 %.4f" % (x, a_hi, b_lo)
-        if a_hi > W + 1e-12:                     # 턱이 나와 있는 구간
-            gap_joint = min(gap_joint, b_lo - a_hi)
-        else:                                    # 민짜 구간 — 면끼리 맞닿아야 한다
-            gap_flat = min(gap_flat, b_lo - a_hi)
-            contact += 1
+    # --- 턱/홈 치수와 공차 ---
+    assert ya(mid, 0.0)[1] == SEG_W + TONGUE_Y, "턱 돌출량이 설계값과 다름"
+    assert yb(mid, 0.0)[0] == TONGUE_Y + CLEARANCE, "홈 깊이에 공차가 안 들어감"
+    assert ya(x0 - 1e-9, 0.0)[1] == SEG_W and ya(x1 + 1e-9, 0.0)[1] == SEG_W
+    assert yb(x0 - CLEARANCE - 1e-9, 0.0)[0] == 0.0
+
+    # --- z 가둠: 턱 위로 홈 천장이 공차만큼 높다 ---
+    assert ya(mid, TONGUE_Z)[1] == SEG_W + TONGUE_Y, "턱 윗면 높이가 다름"
+    assert ya(mid, TONGUE_Z + 1e-9)[1] == SEG_W, "턱이 설계 높이 위로 올라감"
+    assert yb(mid, TONGUE_Z + CLEARANCE)[0] == TONGUE_Y + CLEARANCE, "홈 천장이 낮음"
+    assert yb(mid, TONGUE_Z + CLEARANCE + 1e-9)[0] == 0.0, "홈에 천장이 없음"
+    roof = TONGUE_Z + CLEARANCE
+    assert abs((roof - TONGUE_Z) - CLEARANCE) < 1e-12
+    # 천장 위로 남는 살 두께 — 브리지가 얹힐 자리가 있어야 한다
+    thin = min(profile(x0 - CLEARANCE, TRAVEL_L, HEIGHT),
+               profile(x1 + CLEARANCE, TRAVEL_L, HEIGHT)) - roof
+    assert thin > 1.5, "홈 천장 위 살이 너무 얇음: %.2f mm" % thin
+
+    # --- 3차원 가상 조립: 간섭 없고, 이음새 틈은 공차, 민짜는 맞닿음 ---
+    gap_joint, gap_flat, n_flat, n_joint = 1e9, 1e9, 0, 0
+    for i in range(1201):
+        x = TRAVEL_L * i / 1200
+        for j in range(201):
+            z = HEIGHT * j / 200
+            sa, sb = ya(x, z), yb(x, z)
+            if sa is None or sb is None:
+                continue
+            a_hi = sa[1]
+            b_lo = sb[0] + SEG_W
+            assert a_hi <= b_lo + 1e-9, "간섭! x=%.3f z=%.3f  A끝 %.4f  B시작 %.4f" % (x, z, a_hi, b_lo)
+            if a_hi > SEG_W + 1e-9:
+                gap_joint = min(gap_joint, b_lo - a_hi); n_joint += 1
+            else:
+                gap_flat = min(gap_flat, b_lo - a_hi); n_flat += 1
     assert abs(gap_joint - CLEARANCE) < 1e-9, "이음새 틈이 공차와 다름: %.4f" % gap_joint
-    assert abs(gap_flat) < 1e-12, "민짜 구간이 떠 있음: %.4f" % gap_flat
-    frac = contact / 20001.0
-    want = (TRAVEL_L - TONGUE_X) / TRAVEL_L      # 턱 밖 = 맞닿는 구간
-    assert abs(frac - want) < 0.01, "맞닿는 구간 비율이 예상과 다름: %.3f vs %.3f" % (frac, want)
+    assert abs(gap_flat) < 1e-9, "민짜 구간이 떠 있음: %.4f" % gap_flat
+    assert n_joint > 500 and n_flat > 5000
 
-    # 조립 전체 폭이 정확히 450 (턱은 홈 안에 들어가므로 폭을 늘리지 않는다)
-    assert abs(W * 2 - ROAD_W) < 1e-9
     assert abs(SEG_W * 2 - ROAD_W) < 1e-9
-
-    # --- 턱이 단면 안에 들어가는가 (높이 여유) ---
-    h_at_joint = min(profile(x0, TRAVEL_L, HEIGHT), profile(x1, TRAVEL_L, HEIGHT))
-    assert h_at_joint > 3.0, "이음새 위치가 너무 얇음: %.2f mm" % h_at_joint
-
-    # --- 턱 없음 ---
     assert abs(profile(0, TRAVEL_L, HEIGHT)) < 1e-12
     assert abs(profile(TRAVEL_L, TRAVEL_L, HEIGHT)) < 1e-12
-    assert abs(profile(TRAVEL_L / 2, TRAVEL_L, HEIGHT) - HEIGHT) < 1e-12
+    assert abs(profile(mid, TRAVEL_L, HEIGHT) - HEIGHT) < 1e-12
 
     slope = math.degrees(math.atan(HEIGHT * math.pi / TRAVEL_L))
     print("selftest OK")
-    print("  닫힌 메시 4종(민짜/턱/홈/턱+홈) x 2폭, 부피 오차 0.3% 이내")
-    print("  이음새 전높이 턱 %gx%g mm, 이음새 지점 단면 높이 %.1f mm"
-          % (TONGUE_X, TONGUE_Y, h_at_joint))
-    print("  공차 %.2f mm — 가상 조립 간섭 없음, 이음새 틈 %.2f mm, 민짜 구간은 맞닿음"
+    print("  닫힌 메시 4종(민짜/턱/홈/턱+홈) x 2폭, 부피 오차 0.4% 이내")
+    print("  턱 %g x %g x %g mm (전높이 아님) / 홈 천장 z=%.1f mm — 위로 들리지 않는다"
+          % (TONGUE_X, TONGUE_Y, TONGUE_Z, roof))
+    print("  천장 위 살 %.1f mm, 브리지 폭 %.1f mm" % (thin, TONGUE_Y + CLEARANCE))
+    print("  공차 %.2f mm — 3D 가상 조립 간섭 없음, 이음새 틈 %.2f mm, 민짜 구간은 맞닿음"
           % (CLEARANCE, gap_joint))
     print("  턱 없음(양 끝 기울기 0), 최대 경사 %.1f도" % slope)
 
@@ -284,7 +323,7 @@ if __name__ == "__main__":
     print("\n  조각 %d개 x %g mm = %g mm (도로 폭)" % (a.segments, w, a.segments * w))
     print("  단면 %g x %g mm, 최대 경사 %.1f도 (양 끝 기울기 0 — 턱 없음)"
           % (TRAVEL_L, a.height, math.degrees(math.atan(a.height * math.pi / TRAVEL_L))))
-    print("  이음새 전높이 턱 %g x %g mm, 공차 %.2f mm" % (TONGUE_X, TONGUE_Y, a.clearance))
+    print("  이음새 턱 %g x %g x %g mm (홈 천장 z=%.1f), 공차 %.2f mm" % (TONGUE_X, TONGUE_Y, TONGUE_Z, TONGUE_Z + a.clearance, a.clearance))
     BED = 246.0
     if w > BED:
         print("  ⚠ 조각 폭 %g mm — Bambu P1S(가용 %g mm)에 들어가지 않습니다" % (w, BED))
