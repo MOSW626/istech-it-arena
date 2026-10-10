@@ -16,6 +16,7 @@
 | 대회 규칙 · 일정 · 패널티 · 예산 | [**MANUAL.md**](MANUAL.md) |
 | **PDB(전원 모듈) 사양 · 데이터시트** | [**docs/hardware/power-modules.md**](docs/hardware/power-modules.md) |
 | **경기장 사진 · 조명 조건** | [**docs/venue/**](docs/venue/) |
+| **과속방지턱 출력 파일 · 지침** | [**parts/speed_bump/**](parts/speed_bump/) |
 | 트랙 맵 파일 (시뮬레이터 · 시공용) | [**track/**](track/) — 사용법과 **ArUco 검출 주의사항**은 [track/README.md](track/README.md) |
 | 파일 통째로 다운로드 | [**Releases**](../../releases) 에서 zip — 항상 최신 릴리즈를 받으세요 |
 | 질문 · 파일 문제 제보 · 규칙 제안 | [**Issues**](../../issues) — 아래 "이슈 사용법" 참고 |
