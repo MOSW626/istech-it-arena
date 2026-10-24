@@ -48,6 +48,12 @@ FRICTION_ZONE_LEN = 1.5          # 노면변화 patch length
 GRASS_W = 0.20
 WALL_T = 0.05
 WALL_H = 0.40                    # 2026-09-14 회의 확정 (0.30 → 0.40, ArUco 갠트리 높이와 정렬)
+# 2026-10-24 실물 자재(주문 완료)에 맞춤: 도로 = 백색 포맥스 3T, 직선 벽 = 회색 포맥스 3T,
+# 곡선 벽 = 라이트그레이 EVA(시뮬은 벽 전체를 회색 하나로 둠), 홀 바닥 = 광택 목재.
+# 회색 값은 실물 사진 전 추정치 -- 실물이 오면 사진 기준으로 다시 맞출 것.
+ROAD_RGBA = "0.90 0.90 0.90 1"
+WALL_RGBA = "0.50 0.50 0.50 1"
+HALL_FLOOR_RGBA = "0.55 0.40 0.26 1"
 MIN_RADIUS = 0.45
 CHICANE_MIN_RADIUS = 0.30         # exception for the 직각 시케인 only
 CLEARANCE_MIN = 0.35
@@ -1643,14 +1649,14 @@ def write_sdf(res, boxes, outdir):
     branch_wall_keys = tuple(f"walls_branch{i}_{side}" for i in range(len(branches)) for side in ("left", "right"))
     links = []
 
-    ground = """
+    ground = f"""
     <link name="ground_plane_link">
       <collision name="ground_collision">
         <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
       </collision>
       <visual name="ground_visual">
         <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
-        <material><ambient>0.55 0.55 0.55 1</ambient><diffuse>0.55 0.55 0.55 1</diffuse></material>
+        <material><ambient>{HALL_FLOOR_RGBA}</ambient><diffuse>{HALL_FLOOR_RGBA}</diffuse></material>
       </visual>
     </link>"""
     links.append(ground)
@@ -1663,7 +1669,7 @@ def write_sdf(res, boxes, outdir):
     for key in ("surface_main", "surface_fork1", "surface_fork2") + branch_surface_keys:
         for i, b in enumerate(boxes.get(key, [])):
             surface_shapes.append(_sdf_box_shapes(f"{key}_{i}", b["x"], b["y"], 0.0015, b["yaw"],
-                                                   b["length"], b["width"], 0.003, "0.12 0.12 0.13 1"))
+                                                   b["length"], b["width"], 0.003, ROAD_RGBA))
 
     for key in ("grass_main_left", "grass_main_right", "grass_fork1_left", "grass_fork1_right",
                 "grass_fork2_left", "grass_fork2_right"):
@@ -1675,7 +1681,7 @@ def write_sdf(res, boxes, outdir):
                 "walls_fork2_left", "walls_fork2_right") + branch_wall_keys:
         for i, b in enumerate(boxes.get(key, [])):
             wall_shapes.append(_sdf_box_shapes(f"{key}_{i}", b["x"], b["y"], wall_h / 2.0, b["yaw"],
-                                                b["length"], wall_t, wall_h, "0.85 0.85 0.85 1",
+                                                b["length"], wall_t, wall_h, WALL_RGBA,
                                                 static_friction=0.8))
 
     for name, shapes in (("track_surface", surface_shapes), ("grass", grass_shapes),
