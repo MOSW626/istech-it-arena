@@ -41449,25 +41449,11 @@
       </visual>
     </link>
 
-    <link name="bump_0">
-      <collision name="bump_0_col">
-        <pose>9.9561 9.6665 0.0050 0 0 1.57380</pose>
-        <geometry><box><size>0.4500 0.0500 0.0100</size></box></geometry>
-      </collision>
-      <visual name="bump_0_vis">
-        <pose>9.9561 9.6665 0.0050 0 0 1.57380</pose>
-        <geometry><box><size>0.4500 0.0500 0.0100</size></box></geometry>
-        <material>
-          <ambient>0.9 0.6 0.1 1</ambient><diffuse>0.9 0.6 0.1 1</diffuse>
-        </material>
-      </visual>
-    </link>
-
     <link name="grid_slot_0">
       <pose>9.8638 4.6804 0.0037 0 0 1.56370</pose>
       <visual name="grid_slot_0_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
@@ -41475,7 +41461,7 @@
       <pose>9.8672 5.1804 0.0037 0 0 1.56370</pose>
       <visual name="grid_slot_1_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
@@ -41483,7 +41469,7 @@
       <pose>9.8707 5.6804 0.0037 0 0 1.56390</pose>
       <visual name="grid_slot_2_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
@@ -41491,7 +41477,7 @@
       <pose>10.0425 4.4792 0.0037 0 0 1.56390</pose>
       <visual name="grid_slot_3_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
@@ -41499,7 +41485,7 @@
       <pose>10.0459 4.9792 0.0037 0 0 1.56390</pose>
       <visual name="grid_slot_4_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
@@ -41507,18 +41493,18 @@
       <pose>10.0493 5.4792 0.0037 0 0 1.56390</pose>
       <visual name="grid_slot_5_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
       </visual>
     </link>
 
     <link name="tl_post">
       <collision name="tl_post_col">
-        <pose>9.6910 6.4669 0.6000 0 0 1.56941</pose>
-        <geometry><box><size>0.0600 0.0600 1.2000</size></box></geometry>
+        <pose>9.6886 6.1064 0.2353 0 0 1.56475</pose>
+        <geometry><box><size>0.0600 0.0600 0.4707</size></box></geometry>
       </collision>
       <visual name="tl_post_vis">
-        <pose>9.6910 6.4669 0.6000 0 0 1.56941</pose>
-        <geometry><box><size>0.0600 0.0600 1.2000</size></box></geometry>
+        <pose>9.6886 6.1064 0.2353 0 0 1.56475</pose>
+        <geometry><box><size>0.0600 0.0600 0.4707</size></box></geometry>
         <material>
           <ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse>
         </material>
@@ -41527,90 +41513,141 @@
 
     <link name="tl_beam">
       <collision name="tl_beam_col">
-        <pose>9.9660 6.4665 1.2000 0 0 1.56941</pose>
-        <geometry><box><size>0.7500 0.0600 0.0600</size></box></geometry>
+        <pose>9.9636 6.1048 0.4557 0 0 1.56475</pose>
+        <geometry><box><size>0.0300 0.7500 0.0300</size></box></geometry>
       </collision>
       <visual name="tl_beam_vis">
-        <pose>9.9660 6.4665 1.2000 0 0 1.56941</pose>
-        <geometry><box><size>0.7500 0.0600 0.0600</size></box></geometry>
+        <pose>9.9636 6.1048 0.4557 0 0 1.56475</pose>
+        <geometry><box><size>0.0300 0.7500 0.0300</size></box></geometry>
         <material>
           <ambient>0.2 0.2 0.2 1</ambient><diffuse>0.2 0.2 0.2 1</diffuse>
         </material>
       </visual>
     </link>
 
-    <link name="lamp_red_1">
-      <pose>9.9659 6.4065 1.0800 0 0 0</pose>
-      <visual name="lamp_red_1_vis">
+    <link name="tl_panel">
+      <pose>9.9636 6.1048 0.4190 0 0.52360 4.70634</pose>
+      <visual name="tl_panel_vis">
+        <geometry><box><size>0.0060 0.1700 0.0500</size></box></geometry>
+        <material><ambient>0.6 0.6 0.58 1</ambient><diffuse>0.6 0.6 0.58 1</diffuse></material>
+      </visual>
+      <collision name="tl_panel_col">
+        <geometry><box><size>0.0060 0.1700 0.0500</size></box></geometry>
+      </collision>
+    </link>
+
+    <link name="lamp_red_1_top">
+      <pose>9.9035 6.0975 0.4262 0 0 0</pose>
+      <visual name="lamp_red_1_top_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
           <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_red_1_col">
-        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
-      </collision>
     </link>
 
-    <link name="lamp_red_2">
-      <pose>9.9660 6.4365 1.0800 0 0 0</pose>
-      <visual name="lamp_red_2_vis">
+    <link name="lamp_red_1_bottom">
+      <pose>9.9036 6.1075 0.4088 0 0 0</pose>
+      <visual name="lamp_red_1_bottom_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
           <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_red_2_col">
-        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
-      </collision>
     </link>
 
-    <link name="lamp_red_3">
-      <pose>9.9660 6.4665 1.0800 0 0 0</pose>
-      <visual name="lamp_red_3_vis">
+    <link name="lamp_red_2_top">
+      <pose>9.9335 6.0974 0.4262 0 0 0</pose>
+      <visual name="lamp_red_2_top_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
           <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_red_3_col">
-        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
-      </collision>
     </link>
 
-    <link name="lamp_red_4">
-      <pose>9.9660 6.4965 1.0800 0 0 0</pose>
-      <visual name="lamp_red_4_vis">
+    <link name="lamp_red_2_bottom">
+      <pose>9.9336 6.1074 0.4088 0 0 0</pose>
+      <visual name="lamp_red_2_bottom_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
           <emissive>1 0 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_red_4_col">
-        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
-      </collision>
     </link>
 
-    <link name="lamp_green">
-      <pose>9.9661 6.5265 1.0800 0 0 0</pose>
-      <visual name="lamp_green_vis">
+    <link name="lamp_red_3_top">
+      <pose>9.9635 6.0972 0.4262 0 0 0</pose>
+      <visual name="lamp_red_3_top_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <link name="lamp_red_3_bottom">
+      <pose>9.9636 6.1072 0.4088 0 0 0</pose>
+      <visual name="lamp_red_3_bottom_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <link name="lamp_red_4_top">
+      <pose>9.9935 6.0970 0.4262 0 0 0</pose>
+      <visual name="lamp_red_4_top_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <link name="lamp_red_4_bottom">
+      <pose>9.9936 6.1070 0.4088 0 0 0</pose>
+      <visual name="lamp_red_4_bottom_vis">
+        <geometry><sphere><radius>0.0075</radius></sphere></geometry>
+        <material>
+          <ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse>
+          <emissive>1 0 0 1</emissive>
+        </material>
+      </visual>
+    </link>
+
+    <link name="lamp_green_top">
+      <pose>10.0235 6.0968 0.4262 0 0 0</pose>
+      <visual name="lamp_green_top_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
         <material>
           <ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse>
           <emissive>0 1 0 1</emissive>
         </material>
       </visual>
-      <collision name="lamp_green_col">
+    </link>
+
+    <link name="lamp_green_bottom">
+      <pose>10.0236 6.1068 0.4088 0 0 0</pose>
+      <visual name="lamp_green_bottom_vis">
         <geometry><sphere><radius>0.0075</radius></sphere></geometry>
-      </collision>
+        <material>
+          <ambient>0 1 0 1</ambient><diffuse>0 1 0 1</diffuse>
+          <emissive>0 1 0 1</emissive>
+        </material>
+      </visual>
     </link>
 
     <link name="aruco_0">
-      <pose>9.9660 6.4665 0.4000 0 0 -1.57218</pose>
+      <pose>10.1085 6.0864 0.4000 0 0 -1.57685</pose>
       <visual name="aruco_0_vis">
         <geometry><box><size>0.0050 0.1000 0.1000</size></box></geometry>
         <material>
@@ -41638,7 +41675,7 @@
     </link>
 
     <link name="aruco_45">
-      <pose>9.9613 5.7798 0.4000 0 0 -1.57790</pose>
+      <pose>9.8185 6.0881 0.4000 0 0 -1.57685</pose>
       <visual name="aruco_45_vis">
         <geometry><box><size>0.0050 0.1000 0.1000</size></box></geometry>
         <material>

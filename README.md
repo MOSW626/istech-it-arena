@@ -3,7 +3,7 @@
 **6개 과학기술특성화대학(KAIST · POSTECH · UNIST · DGIST · GIST · KENTECH) 로봇 동아리 연합 자율주행 RC카 레이싱 대회**
 
 - 📅 **2026년 11월 14일 (토)** · 📍 포항 (POSTECH)
-- 🏁 규정 차량(15×20cm)이 신호등을 스스로 인식해 출발, 갈림길·과속방지턱이 있는 서킷을 자율주행으로 완주하는 시간제 레이스
+- 🏁 규정 차량(15×20cm)이 신호등을 스스로 인식해 출발, 갈림길이 있는 서킷을 자율주행으로 완주하는 시간제 레이스
 
 ![트랙 평면도](track/output_final/preview.png)
 
@@ -16,7 +16,7 @@
 | 대회 규칙 · 일정 · 패널티 · 예산 | [**MANUAL.md**](MANUAL.md) |
 | **PDB(전원 모듈) 사양 · 데이터시트** | [**docs/hardware/power-modules.md**](docs/hardware/power-modules.md) |
 | **경기장 사진 · 조명 조건** | [**docs/venue/**](docs/venue/) |
-| **과속방지턱 출력 파일 · 지침** | [**parts/speed_bump/**](parts/speed_bump/) |
+| 과속방지턱 (2026-11-01 제거 — 기록용) | [parts/speed_bump/](parts/speed_bump/) |
 | 트랙 맵 파일 (시뮬레이터 · 시공용) | [**track/**](track/) — 사용법과 **ArUco 검출 주의사항**은 [track/README.md](track/README.md) |
 | 파일 통째로 다운로드 | [**Releases**](../../releases) 에서 zip — 항상 최신 릴리즈를 받으세요 |
 | 질문 · 파일 문제 제보 · 규칙 제안 | [**Issues**](../../issues) — 아래 "이슈 사용법" 참고 |

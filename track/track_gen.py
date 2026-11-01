@@ -54,6 +54,15 @@ WALL_H = 0.40                    # 2026-09-14 회의 확정 (0.30 → 0.40, ArUc
 ROAD_RGBA = "0.90 0.90 0.90 1"
 WALL_RGBA = "0.50 0.50 0.50 1"
 HALL_FLOOR_RGBA = "0.55 0.40 0.26 1"
+GRID_TAPE_RGBA = "0.05 0.05 0.05 1"   # 2026-11-01 3차 회의: 흰 도로라 그리드는 검정 테이프
+# 출발 신호등 실물 (Pinocchio, issue #3 2026-10-28). 도로를 가로지르는 바에 매달린 모듈.
+TL_AHEAD_OF_GRID = 0.30          # 선두 그리드 칸 앞선 -> 신호등 (주행 방향)
+TL_LAMP_CENTER_H = 0.419         # 2x5 발광부 중심 높이 (모듈 하단 0.397)
+TL_TILT_DEG = 60.0               # 발광면이 바닥과 이루는 각 -> 접근 차량 쪽으로 30° 내려다봄
+TL_LAMP_PITCH = 0.030            # 좌우 (발광면 15 + 간격 15 mm)
+TL_LAMP_VPITCH = 0.020           # 세트 안 위아래 (15 + 5 mm)
+TL_PANEL = (0.006, 0.17, 0.05)   # 두께 · 폭 · 높이 -- 사진 기준 추정치
+TL_MARKER_OFFSET = 0.145         # 2026-11-01: ArUco 0·45를 신호등 좌우에 부착 (중심 간 거리)
 MIN_RADIUS = 0.45
 CHICANE_MIN_RADIUS = 0.30         # exception for the 직각 시케인 only
 CLEARANCE_MIN = 0.35
@@ -529,7 +538,7 @@ def build_grid_zone_slots(arr, Ltot, s0, s1, cars):
     return slots, stagger
 
 
-def markers_from_design(arr, Ltot, aruco_list):
+def markers_from_design(arr, Ltot, aruco_list, traffic_light=None):
     """Gantry-mounted markers (2026-09-14 회의 확정).
 
     The marker hangs over the **middle of the road** like a highway overhead
@@ -543,12 +552,22 @@ def markers_from_design(arr, Ltot, aruco_list):
     """
     markers = []
     for m in aruco_list:
-        s = float(m["s"]) % Ltot
-        x, y, th = sample_at_s(arr, s, Ltot)
-        facing = th + math.pi                      # normal points at oncoming traffic
         mid = int(m["id"])
         fake = bool(m.get("fake", False))
         role = ("fake" if fake else REAL_IDS.get(mid, "custom"))
+        if m.get("mount") == "traffic_light":
+            # 2026-11-01 3차 회의: 신호등 좌우에 부착 -- 마커가 신호등을 가리지 않게.
+            # side는 접근 차량이 볼 때 기준.
+            s = traffic_light["s"]
+            x, y, th = sample_at_s(arr, s, Ltot)
+            sign = 1.0 if m.get("side", "left") == "left" else -1.0
+            x += -sign * math.sin(th) * TL_MARKER_OFFSET - math.cos(th) * 0.0175  # 바 앞면에 부착
+            y += sign * math.cos(th) * TL_MARKER_OFFSET - math.sin(th) * 0.0175
+            role = f"traffic_light_{m.get('side', 'left')}"
+        else:
+            s = float(m["s"]) % Ltot
+            x, y, th = sample_at_s(arr, s, Ltot)
+        facing = th + math.pi                      # normal points at oncoming traffic
         markers.append(dict(id=mid, real=(not fake), role=role, x=float(x), y=float(y),
                              z=ARUCO_GANTRY_CENTER_H - ARUCO_SIZE / 2.0,
                              yaw=float(math.atan2(math.sin(facing), math.cos(facing))),
@@ -556,11 +575,17 @@ def markers_from_design(arr, Ltot, aruco_list):
     return markers
 
 
-def traffic_light_from_design(arr, Ltot, tl, track_width_at):
-    s = float(tl.get("s", 0.0)) % Ltot
+def traffic_light_from_design(arr, Ltot, tl, track_width_at, grid_slots=()):
+    if "ahead_of_grid" in tl:
+        # 선두 그리드 칸의 앞선에서 ahead_of_grid만큼 앞 (Pinocchio 설치 기준)
+        lead = max(g["s"] for g in grid_slots)
+        s = (lead + GRID_SLOT_L / 2.0 + float(tl["ahead_of_grid"])) % Ltot
+    else:
+        s = float(tl.get("s", 0.0)) % Ltot
     x, y, th = sample_at_s(arr, s, Ltot)
     tw = track_width_at(s)
-    return dict(x=float(x), y=float(y), yaw=float(th), width=float(tw), gantry_height=1.2,
+    return dict(x=float(x), y=float(y), yaw=float(th), width=float(tw),
+                lamp_center_h=TL_LAMP_CENTER_H, tilt_deg=TL_TILT_DEG,
                 lamps=["red", "red", "red", "red", "green"], side=tl.get("side", "left"), s=float(s))
 
 
@@ -847,8 +872,9 @@ def build_all(scale=1.0, resolution=0.01, bump_height=0.010, grid_cars=6, outdir
 
     # ---- traffic light gantry at start/finish ----
     tlx, tly, tlth = sample_at_s(arr, 0.0, Ltot)
-    traffic_light = dict(x=float(tlx), y=float(tly), yaw=float(tlth), width=track_w0,
-                          gantry_height=1.2 * sc, lamps=["red", "red", "red", "red", "green"])
+    traffic_light = dict(x=float(tlx), y=float(tly), yaw=float(tlth), width=track_w0, s=0.0,
+                          lamp_center_h=TL_LAMP_CENTER_H * sc, tilt_deg=TL_TILT_DEG,
+                          lamps=["red", "red", "red", "red", "green"])
 
     # ---- starting grid: grid_cars in 2 staggered columns, before s=0 ----
     n_cols = 2
@@ -1053,11 +1079,11 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
                                                           float(gz["s1"]) % Ltot, grid_cars)
 
     tl_in = feats.get("traffic_light") or {"s": 0.0, "side": "left"}
-    traffic_light = traffic_light_from_design(arr, Ltot, tl_in, track_width_at)
+    traffic_light = traffic_light_from_design(arr, Ltot, tl_in, track_width_at, grid_slots)
 
     corridor = build_corridor_polygon(arr, tw_arr, branches)
     drivable = build_corridor_polygon(arr, tw_arr, branches, grass_w=0.0)
-    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [])
+    markers = markers_from_design(arr, Ltot, feats.get("aruco") or [], traffic_light)
 
     min_r_general = compute_min_radius(arr, closed)
 
@@ -1710,47 +1736,69 @@ def write_sdf(res, boxes, outdir):
       <pose>{g['x']:.4f} {g['y']:.4f} 0.0037 0 0 {g['yaw']:.5f}</pose>
       <visual name="{name}_vis">
         <geometry><box><size>{g['length']:.4f} {g['width']:.4f} 0.001</size></box></geometry>
-        <material><ambient>1 1 1 1</ambient><diffuse>1 1 1 1</diffuse></material>
+        <material><ambient>{GRID_TAPE_RGBA}</ambient><diffuse>{GRID_TAPE_RGBA}</diffuse></material>
       </visual>
     </link>""")
 
+    # Start light (Pinocchio, issue #3 2026-10-28): a 2x5 lamp panel hanging from a bar
+    # across the road, its face tilted TL_TILT_DEG to the floor so it looks down at the grid.
     tl = res["traffic_light"]
-    gh = tl["gantry_height"]
-    beam_len = tl["width"] + 0.3 * meta["scale"]
-    post_h = gh
-    yaw = tl["yaw"]
-    perp = yaw + math.pi / 2.0
+    sc = meta["scale"]
+    h = tl["yaw"]
+    fwd = (math.cos(h), math.sin(h))
+    left = (-math.sin(h), math.cos(h))                  # driver's left
+    pt, pw, ph = (v * sc for v in TL_PANEL)
+    tilt = math.radians(tl["tilt_deg"])
+    pitch = math.pi / 2.0 - tilt                         # face normal dips this far below horizontal
+    cz = tl["lamp_center_h"]
+    up = (-fwd[0] * math.cos(tilt), -fwd[1] * math.cos(tilt), math.sin(tilt))  # panel "up", leans toward cars
+    nrm = (-fwd[0] * math.sin(tilt), -fwd[1] * math.sin(tilt), -math.cos(tilt))  # face normal
+    face_yaw = h + math.pi
+    top_z = cz + ph / 2.0 * math.sin(tilt)
+    bar_t = 0.03 * sc
+    bar_z = top_z + bar_t / 2.0
+    bar_len = tl["width"] + 0.3 * sc
     tl_sign = 1.0 if tl.get("side", "left") == "left" else -1.0
-    px = tl["x"] + tl_sign * math.cos(perp) * (tl["width"] / 2.0 + 0.05 * meta["scale"])
-    py = tl["y"] + tl_sign * math.sin(perp) * (tl["width"] / 2.0 + 0.05 * meta["scale"])
-    links.append(_sdf_box_link("tl_post", px, py, post_h / 2.0, yaw,
-                                0.06 * meta["scale"], 0.06 * meta["scale"], post_h, "0.2 0.2 0.2 1"))
-    links.append(_sdf_box_link("tl_beam", tl["x"], tl["y"], gh, yaw,
-                                beam_len, 0.06 * meta["scale"], 0.06 * meta["scale"], "0.2 0.2 0.2 1"))
-    # Real unit (Pinocchio, issue #3 2026-10-09): 5 sets left-to-right
-    # RED RED RED RED GREEN, each emitting face ~15 mm across, 15 mm apart.
-    lamp_r = 0.0075 * meta["scale"]          # 15 mm emitting face
-    lamp_pitch = 0.030 * meta["scale"]       # 15 mm face + 15 mm gap
+    post_off = tl["width"] / 2.0 + 0.05 * sc
+    links.append(_sdf_box_link("tl_post", tl["x"] + tl_sign * left[0] * post_off,
+                                tl["y"] + tl_sign * left[1] * post_off, (bar_z + bar_t / 2.0) / 2.0, h,
+                                0.06 * sc, 0.06 * sc, bar_z + bar_t / 2.0, "0.2 0.2 0.2 1"))
+    links.append(_sdf_box_link("tl_beam", tl["x"], tl["y"], bar_z, h,
+                                bar_t, bar_len, bar_t, "0.2 0.2 0.2 1"))
+    links.append(f"""
+    <link name="tl_panel">
+      <pose>{tl['x']:.4f} {tl['y']:.4f} {cz:.4f} 0 {pitch:.5f} {face_yaw:.5f}</pose>
+      <visual name="tl_panel_vis">
+        <geometry><box><size>{pt:.4f} {pw:.4f} {ph:.4f}</size></box></geometry>
+        <material><ambient>0.6 0.6 0.58 1</ambient><diffuse>0.6 0.6 0.58 1</diffuse></material>
+      </visual>
+      <collision name="tl_panel_col">
+        <geometry><box><size>{pt:.4f} {pw:.4f} {ph:.4f}</size></box></geometry>
+      </collision>
+    </link>""")
+    # Left-to-right as the driver sees it: RED RED RED RED GREEN, two sources per set.
+    lamp_r = 0.0075 * sc                     # 15 mm emitting face
     lamp_spec = [("lamp_red_1", "1 0 0 1"), ("lamp_red_2", "1 0 0 1"),
                  ("lamp_red_3", "1 0 0 1"), ("lamp_red_4", "1 0 0 1"),
                  ("lamp_green", "0 1 0 1")]
-    lamp_offsets = [(i - 2) * lamp_pitch / meta["scale"] for i in range(5)]
-    for (name, rgba), doff in zip(lamp_spec, lamp_offsets):
-        lx = tl["x"] + math.cos(yaw) * doff * meta["scale"]
-        ly = tl["y"] + math.sin(yaw) * doff * meta["scale"]
-        links.append(f"""
-    <link name="{name}">
-      <pose>{lx:.4f} {ly:.4f} {gh - 0.12*meta['scale']:.4f} 0 0 0</pose>
-      <visual name="{name}_vis">
+    for i, (name, rgba) in enumerate(lamp_spec):
+        lat = (2 - i) * TL_LAMP_PITCH * sc
+        for j, vo in enumerate((TL_LAMP_VPITCH * sc / 2.0, -TL_LAMP_VPITCH * sc / 2.0)):
+            off = pt / 2.0
+            lx = tl["x"] + left[0] * lat + up[0] * vo + nrm[0] * off
+            ly = tl["y"] + left[1] * lat + up[1] * vo + nrm[1] * off
+            lz = cz + up[2] * vo + nrm[2] * off
+            nm = f"{name}_{'top' if j == 0 else 'bottom'}"
+            links.append(f"""
+    <link name="{nm}">
+      <pose>{lx:.4f} {ly:.4f} {lz:.4f} 0 0 0</pose>
+      <visual name="{nm}_vis">
         <geometry><sphere><radius>{lamp_r:.4f}</radius></sphere></geometry>
         <material>
           <ambient>{rgba}</ambient><diffuse>{rgba}</diffuse>
           <emissive>{rgba}</emissive>
         </material>
       </visual>
-      <collision name="{name}_col">
-        <geometry><sphere><radius>{lamp_r:.4f}</radius></sphere></geometry>
-      </collision>
     </link>""")
 
     for m in res["markers"]:
@@ -1876,14 +1924,16 @@ def write_dxf(res, boxes, outdir):
                       dxfattribs={"layer": "MARKERS"}).set_placement((m["x"] + 0.1, m["y"] + 0.1))
 
     tl = res["traffic_light"]
-    perp = tl["yaw"] + math.pi / 2
-    sf_a = (tl["x"] - math.cos(perp) * (meta["track_w"] / 2 + meta["grass_w"]),
-            tl["y"] - math.sin(perp) * (meta["track_w"] / 2 + meta["grass_w"]))
-    sf_b = (tl["x"] + math.cos(perp) * (meta["track_w"] / 2 + meta["grass_w"]),
-            tl["y"] + math.sin(perp) * (meta["track_w"] / 2 + meta["grass_w"]))
-    msp.add_line(sf_a, sf_b, dxfattribs={"layer": "FEATURES"})
-    msp.add_text("START/FINISH + TRAFFIC LIGHT", height=0.12 * meta["scale"],
-                  dxfattribs={"layer": "FEATURES"}).set_placement((tl["x"] - 0.6, tl["y"] + 0.3))
+    sfx, sfy, sfth = sample_at_s(res["arr"], meta["startfinish_s"], meta["Ltot"])
+    for (cx, cy, th), label, dy in (((sfx, sfy, sfth), "START/FINISH", 0.3),
+                                    ((tl["x"], tl["y"], tl["yaw"]), "TRAFFIC LIGHT", -0.3)):
+        perp = th + math.pi / 2
+        half = meta["track_w"] / 2 + meta["grass_w"]
+        msp.add_line((cx - math.cos(perp) * half, cy - math.sin(perp) * half),
+                     (cx + math.cos(perp) * half, cy + math.sin(perp) * half),
+                     dxfattribs={"layer": "FEATURES"})
+        msp.add_text(label, height=0.12 * meta["scale"],
+                      dxfattribs={"layer": "FEATURES"}).set_placement((cx - 0.6, cy + dy))
 
     doc.saveas(os.path.join(outdir, "venue_layout.dxf"))
 
@@ -2016,7 +2066,7 @@ def write_scene_json(res, outdir, checks):
             "s_m": round(sf_s, 4),
             "pose": {"x": round(float(sf_x), 4), "y": round(float(sf_y), 4),
                       "yaw_rad": round(float(sf_th), 4)},
-            "note": "공식 출발/결승 기준. 신호등·ArUco ID0·체커라인이 모두 이 지점에 정렬됨.",
+            "note": "공식 출발/결승 기준. 신호등과 ArUco ID0·45는 이 지점이 아니라 traffic_light.s_m에 있음 (2026-11-01).",
         },
         "alt_routes": ({
             "fork1": {
@@ -2065,13 +2115,17 @@ def write_scene_json(res, outdir, checks):
         "speed_bumps": {
             "bump_length_m": BUMP_LEN * meta["scale"], "bump_height_m": meta["bump_height"],
             "spacing_m": BUMP_SPACING * meta["scale"], "count": len(res["bumps"]),
+            "note": "2026-11-01 3차 회의에서 과속방지턱 제거 확정 -- 대회 트랙에는 없음",
             "bumps": [dict(x=round(b["x"], 4), y=round(b["y"], 4), yaw_rad=round(b["yaw"], 4),
                             s_m=round(b["s"], 3)) for b in res["bumps"]],
         },
         "traffic_light": {
             "pose": {"x": round(res["traffic_light"]["x"], 4), "y": round(res["traffic_light"]["y"], 4),
                       "yaw_rad": round(res["traffic_light"]["yaw"], 4)},
-            "gantry_height_m": res["traffic_light"]["gantry_height"],
+            "s_m": round(res["traffic_light"]["s"], 3),
+            "lamp_center_height_m": res["traffic_light"]["lamp_center_h"],
+            "face_tilt_to_floor_deg": res["traffic_light"]["tilt_deg"],
+            "note": "선두 그리드 칸 앞선에서 0.30 m 앞, 도로를 가로지르는 바에 매달림 (Pinocchio #3 2026-10-28)",
             "lamps": res["traffic_light"]["lamps"], "udp_port": 47810,
         },
         "aruco_markers": {
@@ -2391,18 +2445,24 @@ def render_preview(res, boxes, outdir, checks):
                     arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
 
     tl = res["traffic_light"]
-    perp = tl["yaw"] + math.pi / 2
+    sfx, sfy, sfth = sample_at_s(arr, meta["startfinish_s"], meta["Ltot"])
+    perp = sfth + math.pi / 2
     half = meta["track_w"] / 2 + meta["grass_w"]
-    sf_a = (tl["x"] - math.cos(perp) * half, tl["y"] - math.sin(perp) * half)
-    sf_b = (tl["x"] + math.cos(perp) * half, tl["y"] + math.sin(perp) * half)
+    sf_a = (sfx - math.cos(perp) * half, sfy - math.sin(perp) * half)
+    sf_b = (sfx + math.cos(perp) * half, sfy + math.sin(perp) * half)
     ax.plot([sf_a[0], sf_b[0]], [sf_a[1], sf_b[1]], color="white", lw=2.5, zorder=7, solid_capstyle="butt")
     ax.plot([sf_a[0], sf_b[0]], [sf_a[1], sf_b[1]], color="black", lw=2.5, zorder=6.5, ls=(0, (3, 3)))
-    ax.plot(tl["x"], tl["y"] + half + 0.15 * meta["scale"], marker="^", color="black", ms=14, zorder=8)
-    for i, c in enumerate(["red", "gold", "green"]):
-        ax.plot(tl["x"] + (i - 1) * 0.08 * meta["scale"], tl["y"] + half + 0.15 * meta["scale"],
-                 marker="o", color=c, ms=6, zorder=9)
-    ax.annotate("출발/결승선 + 신호등", (tl["x"], tl["y"] + half + 0.15 * meta["scale"]),
-                xytext=(tl["x"] + 2.6, tl["y"] + 0.3), fontproperties=kr_font,
+    ax.annotate("출발/결승선", (sf_b[0], sf_b[1]), xytext=(sfx + 2.0, sfy + 0.6), fontproperties=kr_font,
+                fontsize=9, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
+    # start light: bar across the road + glyph beside it (light sits 0.3 m ahead of the grid)
+    tperp = tl["yaw"] + math.pi / 2
+    tw2 = meta["track_w"] / 2
+    ax.plot([tl["x"] - math.cos(tperp) * tw2, tl["x"] + math.cos(tperp) * tw2],
+            [tl["y"] - math.sin(tperp) * tw2, tl["y"] + math.sin(tperp) * tw2], color="red", lw=2.5, zorder=7)
+    gx_, gy_ = tl["x"] - math.cos(tperp) * (half + 0.15), tl["y"] - math.sin(tperp) * (half + 0.15)
+    ax.plot(gx_, gy_, marker="^", color="black", ms=11, zorder=8)
+    ax.annotate("신호등 (선두 그리드 앞 0.3 m, ArUco 0·45 좌우 부착)", (gx_, gy_),
+                xytext=(gx_ + 1.0, gy_ - 0.5), fontproperties=kr_font,
                 fontsize=9, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
 
     # gates (built-in-course only; --design mode has no gates/forks concept)
@@ -2451,7 +2511,8 @@ def render_preview(res, boxes, outdir, checks):
         if m["real"]:
             ax.plot(m["x"], m["y"], "o", color="dodgerblue", ms=7, mec="black", zorder=9)
             ax.annotate(f"ID{m['id']}", (m["x"], m["y"]), fontsize=8, color="navy",
-                        xytext=(4, 4), textcoords="offset points", zorder=10)
+                        xytext=((-26, 4) if m.get("role", "").endswith("_left") else (4, 4)),
+                        textcoords="offset points", zorder=10)
         else:
             ax.plot(m["x"], m["y"], "x", color="red", ms=10, mew=2.2, zorder=9)
             ax.annotate(f"ID{m['id']}(fake)", (m["x"], m["y"]), fontsize=8, color="red",
@@ -2503,7 +2564,7 @@ def render_preview(res, boxes, outdir, checks):
     legend_items += [
         (plt.Line2D([0], [0], color="#7CCB6E", lw=8), "잔디 완충구간"),
         (plt.Line2D([0], [0], color="black", lw=6), f"벽 (높이 {WALL_H}m, 두께 0.05m)"),
-        (plt.Line2D([0], [0], color="#B8860B", lw=6), "과속방지턱 구간"),
+    ] + ([(plt.Line2D([0], [0], color="#B8860B", lw=6), "과속방지턱 구간")] if res["bumps"] else []) + [
         (plt.Line2D([0], [0], color="#9B59B6", lw=6), "노면변화 구간"),
         (plt.Line2D([0], [0], color="white", lw=1.5, marker="s", mec="black"), "출발 그리드 슬롯"),
         (plt.Line2D([0], [0], marker="o", color="dodgerblue", lw=0, mec="black"), "실제 ArUco 마커"),

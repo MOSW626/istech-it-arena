@@ -3536,7 +3536,7 @@
       "y": 6.4665,
       "yaw_rad": 1.5694
     },
-    "note": "\uacf5\uc2dd \ucd9c\ubc1c/\uacb0\uc2b9 \uae30\uc900. \uc2e0\ud638\ub4f1\u00b7ArUco ID0\u00b7\uccb4\ucee4\ub77c\uc778\uc774 \ubaa8\ub450 \uc774 \uc9c0\uc810\uc5d0 \uc815\ub82c\ub428."
+    "note": "\uacf5\uc2dd \ucd9c\ubc1c/\uacb0\uc2b9 \uae30\uc900. \uc2e0\ud638\ub4f1\uacfc ArUco ID0\u00b745\ub294 \uc774 \uc9c0\uc810\uc774 \uc544\ub2c8\ub77c traffic_light.s_m\uc5d0 \uc788\uc74c (2026-11-01)."
   },
   "alt_routes": {},
   "branches": [
@@ -4235,23 +4235,20 @@
     "bump_length_m": 0.05,
     "bump_height_m": 0.01,
     "spacing_m": 0.6,
-    "count": 1,
-    "bumps": [
-      {
-        "x": 9.9561,
-        "y": 9.6665,
-        "yaw_rad": 1.5738,
-        "s_m": 3.2
-      }
-    ]
+    "count": 0,
+    "note": "2026-11-01 3\ucc28 \ud68c\uc758\uc5d0\uc11c \uacfc\uc18d\ubc29\uc9c0\ud131 \uc81c\uac70 \ud655\uc815 -- \ub300\ud68c \ud2b8\ub799\uc5d0\ub294 \uc5c6\uc74c",
+    "bumps": []
   },
   "traffic_light": {
     "pose": {
-      "x": 9.966,
-      "y": 6.4665,
-      "yaw_rad": 1.5694
+      "x": 9.9636,
+      "y": 6.1048,
+      "yaw_rad": 1.5647
     },
-    "gantry_height_m": 1.2,
+    "s_m": 46.271,
+    "lamp_center_height_m": 0.419,
+    "face_tilt_to_floor_deg": 60.0,
+    "note": "\uc120\ub450 \uadf8\ub9ac\ub4dc \uce78 \uc55e\uc120\uc5d0\uc11c 0.30 m \uc55e, \ub3c4\ub85c\ub97c \uac00\ub85c\uc9c0\ub974\ub294 \ubc14\uc5d0 \ub9e4\ub2ec\ub9bc (Pinocchio #3 2026-10-28)",
     "lamps": [
       "red",
       "red",
@@ -4271,15 +4268,15 @@
       {
         "id": 0,
         "real": true,
-        "role": "start_finish",
+        "role": "traffic_light_right",
         "pose": {
-          "x": 9.966,
-          "y": 6.4665,
+          "x": 10.1085,
+          "y": 6.0864,
           "z": 0.35,
-          "yaw_rad": -1.5722
+          "yaw_rad": -1.5768
         },
         "normal_note": "yaw points along the marker's outward-facing normal (the direction the face looks)",
-        "s_m": 0.0,
+        "s_m": 46.271,
         "note": ""
       },
       {
@@ -4299,15 +4296,15 @@
       {
         "id": 45,
         "real": true,
-        "role": "grid_entry",
+        "role": "traffic_light_left",
         "pose": {
-          "x": 9.9613,
-          "y": 5.7798,
+          "x": 9.8185,
+          "y": 6.0881,
           "z": 0.35,
-          "yaw_rad": -1.5779
+          "yaw_rad": -1.5768
         },
         "normal_note": "yaw points along the marker's outward-facing normal (the direction the face looks)",
-        "s_m": 45.946,
+        "s_m": 46.271,
         "note": ""
       },
       {
