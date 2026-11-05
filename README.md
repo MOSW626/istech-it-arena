@@ -5,7 +5,11 @@
 - 📅 **2026년 11월 14일 (토)** · 📍 포항 (POSTECH)
 - 🏁 규정 차량(15×20cm)이 신호등을 스스로 인식해 출발, 갈림길이 있는 서킷을 자율주행으로 완주하는 시간제 레이스
 
-![트랙 평면도](track/output_final/preview.png)
+> ⚠️ **코스 변경 예정 (2026-11-05)** — 설치 여건상 **도로 폭 0.61 m · 직각 코너 10곳**의 직선 재단 코스로 바뀔 예정입니다.
+> 아래 평면도와 시뮬은 아직 기존 코스입니다. 변경점은 [track/README.md](track/README.md) 맨 위,
+> 도면은 [`track/track_610mm_build_2026-11-05.pdf`](track/track_610mm_build_2026-11-05.pdf).
+
+![트랙 평면도 (기존 코스)](track/output_final/preview.png)
 
 ## 이 저장소가 대회의 공식 공유소입니다
 
