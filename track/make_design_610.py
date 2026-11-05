@@ -32,7 +32,7 @@ branches = [dict(name="지름길 P22", width_m=0.2, s0=s_of(P22[0]), s1=s_of(P22
 d = dict(
     version=4, hall=dict(w=11, h=14.5), track_width_m=0.61, closed=True,
     corner_join="mitre", course_name="610mm 직각 코스 (2026-11-05 도면)",
-    source="track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco are PROVISIONAL",
+    source="track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco 30 are PROVISIONAL",
     control_points=[], centerline=[list(p) for p in loop],
     features=dict(
         start_line=dict(s=0.0),
@@ -40,7 +40,9 @@ d = dict(
         bump_zones=[], friction_zones=[],
         grid_zone=dict(s0=L - 2.03, s1=L - 0.53, cars=6),
         aruco=[dict(id=0, fake=False, s=0.0, side="right", mount="traffic_light"),
-               dict(id=20, fake=False, s=branches[0]["s0"] - 0.6, side="left"),
+               # ID20: P22 직전 코너 (X_M2, Y_6) 위, 다가오는 y=6 직선을 향함 (2026-11-06 확정, 렌더 검출 1.4~1.8 m).
+               # 분기 0.6 m 전(코너 출구 0.9 m)은 근거리 사각이라 안 보였다. 코너 점의 heading은 이등분선이라 1.5 cm 앞 s를 쓴다(진행 방향 = -x).
+               dict(id=20, fake=False, s=s_of((X_M2, Y_6)) - 0.015, side="left"),
                dict(id=45, fake=False, s=0.0, side="left", mount="traffic_light"),
                dict(id=30, fake=False, s=branches[1]["s0"] - 0.6, side="left")]),
     branches=branches,

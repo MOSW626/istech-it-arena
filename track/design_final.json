@@ -8,7 +8,7 @@
  "closed": true,
  "corner_join": "mitre",
  "course_name": "610mm 직각 코스 (2026-11-05 도면)",
- "source": "track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco are PROVISIONAL",
+ "source": "track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco 30 are PROVISIONAL",
  "control_points": [],
  "centerline": [
   [
@@ -83,7 +83,7 @@
    {
     "id": 20,
     "fake": false,
-    "s": 18.46,
+    "s": 17.545,
     "side": "left"
    },
    {

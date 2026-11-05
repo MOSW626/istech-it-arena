@@ -9900,7 +9900,7 @@
     </link>
 
     <link name="aruco_20">
-      <pose>6.1400 5.1000 0.4000 0 0 1.57080</pose>
+      <pose>6.1550 6.0000 0.4000 0 0 -0.00000</pose>
       <visual name="aruco_20_vis">
         <geometry><box><size>0.0050 0.1000 0.1000</size></box></geometry>
         <material>
