@@ -46,6 +46,8 @@ NARROW_FLAT_LEN = 1.0            # length held at NARROW_W
 NARROW_TAPER_LEN = 0.35          # linear taper in/out on each side
 FRICTION_ZONE_LEN = 1.5          # 노면변화 patch length
 GRASS_W = 0.20
+ISLAND_GRASS_ONLY_M2 = 0.10      # corner_join "mitre": smaller islands get grass, no wall
+TILE_RES = 0.005                 # corner_join "mitre": road/grass tiled as axis-aligned boxes on this grid
 WALL_T = 0.05
 WALL_H = 0.40                    # 2026-09-14 회의 확정 (0.30 → 0.40, ArUco 갠트리 높이와 정렬)
 # 2026-10-24 실물 자재(주문 완료)에 맞춤: 도로 = 백색 포맥스 3T, 직선 벽 = 회색 포맥스 3T,
@@ -427,6 +429,31 @@ def build_arr_from_control_points(cps, closed, spacing=0.02):
     dense = build_dense_curve(cps, closed, 24)
     rs = resample_by_arclength(dense, spacing, closed)
     return _arr_from_resampled(rs, closed)
+
+
+def mitre_offset(arr, offset):
+    """Closed-loop offset with square (mitred) corners, as a (N,4) [x,y,theta,s]
+    array whose s is the projection back onto the centerline."""
+    from shapely.geometry import LineString, Point
+    ring = [tuple(p) for p in arr[:, :2]]
+    center = LineString(ring + [ring[0]])
+    line = center.offset_curve(offset, join_style="mitre")
+    # GEOS starts the offset ring at an arbitrary corner: densify it like the
+    # centerline, then rotate it so it starts beside s=0 (as left/right_b always have)
+    pts = list(line.coords)
+    if math.hypot(pts[-1][0] - pts[0][0], pts[-1][1] - pts[0][1]) < 1e-9:
+        pts = pts[:-1]
+    dense = []
+    for (xa, ya), (xb, yb) in zip(pts, pts[1:] + pts[:1]):   # per edge, so corners stay exact
+        n = max(1, int(math.ceil(math.hypot(xb - xa, yb - ya) / 0.01 - 1e-9)))
+        dense += [(xa + (xb - xa) * i / n, ya + (yb - ya) * i / n) for i in range(n)]
+    pts = dense
+    s = [center.project(Point(p)) for p in pts]
+    k = int(np.argmin(s))
+    pts, s = pts[k:] + pts[:k], s[k:] + s[:k]
+    out, _ = _arr_from_resampled(pts, closed=True)
+    out[:, 3] = s
+    return out
 
 
 def build_arr_from_centerline(centerline_pts, closed, spacing=0.02):
@@ -990,6 +1017,10 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
 
     track_w0 = float(design.get("track_width_m", TRACK_W))
     closed = bool(design.get("closed", True))
+    # "mitre" = straight strips meeting at right angles (610mm course, 2026-11-05).
+    # 0.01 m spacing lands a sample exactly on every cm-grid corner, so s / lap length stay exact.
+    square = design.get("corner_join") == "mitre"
+    spacing = 0.01 if square else 0.02
 
     if version >= 3:
         # v3: control_points may mix 'corner' (straight + fillet) and
@@ -1001,7 +1032,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
         if not centerline_in or len(centerline_in) < 2:
             raise ValueError("v3 design.json is missing a dense 'centerline' array "
                               "(track_editor.html should always export one)")
-        arr, Ltot = build_arr_from_centerline(centerline_in, closed, spacing=0.02)
+        arr, Ltot = build_arr_from_centerline(centerline_in, closed, spacing=spacing)
     else:
         # v2 (or unversioned legacy): control_points are plain [x,y] pairs and
         # the whole centerline is one global Catmull-Rom curve through them.
@@ -1024,7 +1055,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
             print(f"[track_gen] WARNING: branch #{bi} ({b.get('name','?')}) has no dense "
                   f"centerline -- skipping")
             continue
-        barr, blen = build_arr_from_centerline(centerline_b, closed=False, spacing=0.02)
+        barr, blen = build_arr_from_centerline(centerline_b, closed=False, spacing=spacing)
         branches.append(dict(
             name=b.get("name", f"갈림길{bi + 1}"),
             width_m=float(b.get("width_m", NARROW_W)),
@@ -1055,6 +1086,14 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
     right_grass_out = offset_polyline(arr, -(tw_arr / 2.0 + gh_arr))
     left_wall_c = offset_polyline(arr, tw_arr / 2.0 + gh_arr + wall_t / 2.0)
     right_wall_c = offset_polyline(arr, -(tw_arr / 2.0 + gh_arr + wall_t / 2.0))
+    if square:
+        # per-point normals spike at a right angle (inner side doubles back);
+        # take the true mitred offset instead.
+        left_b, right_b = mitre_offset(arr, track_w0 / 2.0), mitre_offset(arr, -track_w0 / 2.0)
+        left_grass_out = mitre_offset(arr, track_w0 / 2.0 + grass_w0)
+        right_grass_out = mitre_offset(arr, -(track_w0 / 2.0 + grass_w0))
+        left_wall_c = mitre_offset(arr, track_w0 / 2.0 + grass_w0 + wall_t / 2.0)
+        right_wall_c = mitre_offset(arr, -(track_w0 / 2.0 + grass_w0 + wall_t / 2.0))
 
     bumps = []
     for z in feats.get("bump_zones") or []:
@@ -1081,8 +1120,8 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
     tl_in = feats.get("traffic_light") or {"s": 0.0, "side": "left"}
     traffic_light = traffic_light_from_design(arr, Ltot, tl_in, track_width_at, grid_slots)
 
-    corridor = build_corridor_polygon(arr, tw_arr, branches)
-    drivable = build_corridor_polygon(arr, tw_arr, branches, grass_w=0.0)
+    corridor = build_corridor_polygon(arr, tw_arr, branches, square=square)
+    drivable = build_corridor_polygon(arr, tw_arr, branches, grass_w=0.0, square=square)
     markers = markers_from_design(arr, Ltot, feats.get("aruco") or [], traffic_light)
 
     min_r_general = compute_min_radius(arr, closed)
@@ -1109,7 +1148,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
         centroid=centroid.tolist(), startfinish_s=startfinish_s,
         narrow_zones=meta_narrow_zones,
         grid_start_s=(float(gz["s0"]) % Ltot if gz else 0.0), grid_ext=0.0,
-        grid_stagger=float(grid_stagger), design_mode=True,
+        grid_stagger=float(grid_stagger), design_mode=True, square_corners=square,
     )
 
     return dict(arr=arr, left_b=left_b, right_b=right_b, left_grass_out=left_grass_out,
@@ -1137,6 +1176,10 @@ def run_checks(res, boxes=None):
     # 1. min radius: general vertices >= MIN_RADIUS, chicane vertices >= CHICANE_MIN_RADIUS
     results["min_centerline_radius_general_m"] = round(meta["min_r_general"], 4)
     results["min_radius_general_ok"] = meta["min_r_general"] >= MIN_RADIUS * sc - 1e-9
+    if meta.get("square_corners"):
+        # right-angle corners by design (610mm course) -- radius is not a criterion
+        results["min_radius_general_ok"] = True
+        results["min_radius_note"] = "corner_join=mitre: 직각 코너 (의도)"
     results["min_centerline_radius_chicane_m"] = (round(meta["min_r_chicane"], 4)
                                                     if meta["min_r_chicane"] is not None else None)
     results["min_radius_chicane_ok"] = (meta["min_r_chicane"] is None or
@@ -1200,7 +1243,9 @@ def run_checks(res, boxes=None):
     for i in range(len(Ps)):
         ds = np.abs(S - S[i])
         ds = np.minimum(ds, Ltot - ds)
-        far = ds > 1.2 * sc
+        # on a right angle two points ds apart are still >= ds/sqrt(2) apart, so a
+        # square corner needs ds > 2.0 before it stops counting as "the same corner"
+        far = ds > (2.0 if meta.get("square_corners") else 1.2) * sc
         if not far.any():
             continue
         d = np.hypot(XY[far, 0] - XY[i, 0], XY[far, 1] - XY[i, 1])
@@ -1329,8 +1374,9 @@ def run_checks(res, boxes=None):
         try:
             from shapely.geometry import Polygon as _CovPoly
             from shapely.ops import unary_union as _cov_union
-            drivable = build_corridor_polygon(arr, res["tw_arr"], branches, sc, grass_w=0.0)
-            corridor = build_corridor_polygon(arr, res["tw_arr"], branches, sc)
+            sq = meta.get("square_corners", False)
+            drivable = build_corridor_polygon(arr, res["tw_arr"], branches, sc, grass_w=0.0, square=sq)
+            corridor = build_corridor_polygon(arr, res["tw_arr"], branches, sc, square=sq)
             grass_region = corridor.difference(drivable)
 
             def _u(prefix):
@@ -1396,7 +1442,7 @@ def write_csvs(res, outdir):
                 f.write(f"{row[0]:.5f},{row[1]:.5f},{row[3]:.5f},{b['width_m']:.4f}\n")
 
 
-def build_corridor_polygon(arr, tw_arr, branches, scale=1.0, grass_w=GRASS_W):
+def build_corridor_polygon(arr, tw_arr, branches, scale=1.0, grass_w=GRASS_W, square=False):
     """Drivable corridor (main ribbon + grass + branch ribbons) as one polygon.
     Its boundary is exactly where the design-mode walls go, so marker placement
     and wall generation both derive from it. grass_w=0 gives the bare drivable
@@ -1405,12 +1451,21 @@ def build_corridor_polygon(arr, tw_arr, branches, scale=1.0, grass_w=GRASS_W):
     from shapely.ops import unary_union
     pts = arr[:, :2].tolist()
     pts.append(pts[0])
-    parts = [LineString(pts).buffer(float(np.max(tw_arr)) / 2.0 + grass_w * scale)]
+    # square=True (design corner_join "mitre", 2026-11-05 610mm course): right-angle
+    # corners stay square, and branches get their own grass band like the main road.
+    join = "mitre" if square else "round"
+    parts = [LineString(pts).buffer(float(np.max(tw_arr)) / 2.0 + grass_w * scale, join_style=join)]
     for br in (branches or []):
-        parts.append(LineString(br["arr"][:, :2]).buffer(br["width_m"] / 2.0))
+        parts.append(LineString(br["arr"][:, :2]).buffer(
+            br["width_m"] / 2.0 + (grass_w * scale if square else 0.0), join_style=join))
     corridor = unary_union(parts).buffer(0)
     if corridor.geom_type == "MultiPolygon":
         corridor = max(corridor.geoms, key=lambda g: g.area)
+    if square and grass_w > 0:
+        # an island too small for its own wall is grass only (pdf p.4: P21 옆 삼각형)
+        from shapely.geometry import Polygon
+        corridor = Polygon(corridor.exterior,
+                           [h for h in corridor.interiors if Polygon(h).area >= ISLAND_GRASS_ONLY_M2])
     return corridor
 
 
@@ -1423,16 +1478,24 @@ def build_union_wall_boxes(res, wall_step):
     from shapely.geometry import Polygon as ShPolygon
     meta = res["meta"]
     wt = meta["wall_t"]
-    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"])
-    rings = [corridor.buffer(wt / 2.0).exterior]
+    sq = meta.get("square_corners", False)
+    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"], square=sq)
+    join = "mitre" if sq else "round"
+    rings = [corridor.buffer(wt / 2.0, join_style=join).exterior]
     for hole in corridor.interiors:
-        inner = ShPolygon(hole).buffer(-wt / 2.0)
+        inner = ShPolygon(hole).buffer(-wt / 2.0, join_style=join)
         geoms = list(inner.geoms) if inner.geom_type == "MultiPolygon" else ([] if inner.is_empty else [inner])
         for g in geoms:
             # ponytail: islands shorter than 0.6m of wall are dropped (grass-only separation)
             if g.exterior.length >= 0.6:
                 rings.append(g.exterior)
     boxes = []
+    if sq:
+        # straight walls: one mitred box per ring edge, no chord-cut corners
+        for ring in rings:
+            pts = [(x, y, 0.0) for x, y in list(ring.coords)[:-1]]
+            boxes += build_ribbon_boxes(pts, wt, closed=True, overlap=1.0, mitre=True)
+        return boxes
     for ring in rings:
         rs = resample_by_arclength([(p[0], p[1]) for p in ring.coords], wall_step, closed=True)
         rarr, _ = _arr_from_resampled(rs, closed=True)
@@ -1451,9 +1514,10 @@ def build_union_grass_boxes(res, step):
     import shapely
     from shapely.geometry.polygon import orient
     meta = res["meta"]
-    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"])
+    sq = meta.get("square_corners", False)
+    corridor = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"], square=sq)
     drivable = build_corridor_polygon(res["arr"], res["tw_arr"], res.get("branches"), meta["scale"],
-                                       grass_w=0.0)
+                                       grass_w=0.0, square=sq)
     grass = corridor.difference(drivable)
     # orient(+1) => exterior CCW, holes CW => the right-hand normal always
     # points OUT of the drivable area, i.e. into the grass band.
@@ -1479,6 +1543,34 @@ def build_union_grass_boxes(res, step):
         pts = np.column_stack([rarr[:, 0] + nx * w / 2.0, rarr[:, 1] + ny * w / 2.0,
                                rarr[:, 2], rarr[:, 3]])
         boxes += [b for b in build_ribbon_boxes(pts, w, closed=True) if b["width"] > 0.01]
+    return boxes
+
+
+def tile_boxes(poly, res=TILE_RES):
+    """Cover a polygon with axis-aligned boxes on a `res` grid anchored at the hall
+    origin: exact on every cm-grid edge, a res-step staircase on diagonals (P21).
+    Row runs are found per grid row, then identical runs in consecutive rows merge."""
+    import shapely
+    x0, y0, x1, y1 = poly.bounds
+    i0, j0 = int(math.floor(x0 / res)), int(math.floor(y0 / res))
+    i1, j1 = int(math.ceil(x1 / res)), int(math.ceil(y1 / res))
+    xs = (np.arange(i0, i1) + 0.5) * res
+    boxes, open_runs = [], {}          # (a, b) -> starting row
+    for j in range(j0, j1 + 1):
+        if j < j1:
+            inside = shapely.contains_xy(poly, xs, np.full_like(xs, (j + 0.5) * res))
+            edges = np.flatnonzero(np.diff(np.r_[0, inside.astype(np.int8), 0]))
+            runs = set(zip(edges[0::2], edges[1::2]))
+        else:
+            runs = set()
+        for ab in list(open_runs):
+            if ab not in runs:
+                ja = open_runs.pop(ab)
+                a, b = ab
+                boxes.append(dict(x=(i0 + (a + b) / 2.0) * res, y=(ja + j) / 2.0 * res, yaw=0.0,
+                                  length=(b - a) * res, width=(j - ja) * res))
+        for ab in runs:
+            open_runs.setdefault(ab, j)
     return boxes
 
 
@@ -1514,6 +1606,19 @@ def build_geometry_boxes(res, wall_step=0.14, surface_step=0.08, grass_step=0.04
     rg_dec, gh_d_r = dec_with_width(rg, res["gh_arr"], surface_step)
 
     branches = res.get("branches") or []
+    if meta.get("square_corners"):
+        corridor = build_corridor_polygon(arr, res["tw_arr"], branches, meta["scale"], square=True)
+        drivable = build_corridor_polygon(arr, res["tw_arr"], branches, meta["scale"], grass_w=0.0,
+                                          square=True)
+        out["surface_main"] = tile_boxes(drivable)          # branches included
+        out["grass_main_left"] = tile_boxes(corridor.difference(drivable))
+        out["walls_main_left"] = build_union_wall_boxes(res, wall_step)
+        for key in ("grass_main_right", "walls_main_right"):
+            out[key] = []
+        for i in range(len(branches)):
+            for key in (f"surface_branch{i}", f"walls_branch{i}_left", f"walls_branch{i}_right"):
+                out[key] = []
+        return out
     if branches:
         # Walls AND grass both come from the corridor/drivable union polygons,
         # so they line up around every 갈림길 mouth by construction. The
@@ -2378,8 +2483,9 @@ def render_preview(res, boxes, outdir, checks):
         # 갈림길 surroundings as grass too.
         from matplotlib.path import Path
         from matplotlib.patches import PathPatch
-        corr = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"])
-        drv = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"], grass_w=0.0)
+        sq = meta.get("square_corners", False)
+        corr = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"], square=sq)
+        drv = build_corridor_polygon(res["arr"], res["tw_arr"], branches, meta["scale"], grass_w=0.0, square=sq)
         gpoly = corr.difference(drv)
         verts, codes = [], []
         for g in (gpoly.geoms if gpoly.geom_type == "MultiPolygon" else [gpoly]):
