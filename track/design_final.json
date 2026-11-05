@@ -7,6 +7,7 @@
  "track_width_m": 0.61,
  "closed": true,
  "corner_join": "mitre",
+ "course_name": "610mm 직각 코스 (2026-11-05 도면)",
  "source": "track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco are PROVISIONAL",
  "control_points": [],
  "centerline": [
@@ -106,6 +107,10 @@
    "width_m": 0.2,
    "s0": 19.060000000000002,
    "s1": 23.89,
+   "label_offset": [
+    1.7,
+    0.25
+   ],
    "control_points": [],
    "centerline": [
     [
@@ -123,6 +128,10 @@
    "width_m": 0.2,
    "s0": 30.314999999999998,
    "s1": 33.724999999999994,
+   "label_offset": [
+    1.7,
+    -0.05
+   ],
    "control_points": [],
    "centerline": [
     [

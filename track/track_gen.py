@@ -1061,7 +1061,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
             width_m=float(b.get("width_m", NARROW_W)),
             s0=float(b.get("s0", 0.0)) % Ltot,
             s1=float(b.get("s1", 0.0)) % Ltot,
-            arr=barr, length=float(blen),
+            arr=barr, length=float(blen), label_offset=b.get("label_offset"),
         ))
 
     feats = design.get("features", {}) or {}
@@ -1149,6 +1149,7 @@ def build_all_from_design(design, resolution=0.01, bump_height=0.010, grid_cars_
         narrow_zones=meta_narrow_zones,
         grid_start_s=(float(gz["s0"]) % Ltot if gz else 0.0), grid_ext=0.0,
         grid_stagger=float(grid_stagger), design_mode=True, square_corners=square,
+        course_name=design.get("course_name", "사용자 설계 코스 (track_editor.html)"),
     )
 
     return dict(arr=arr, left_b=left_b, right_b=right_b, left_grass_out=left_grass_out,
@@ -2160,7 +2161,7 @@ def write_scene_json(res, outdir, checks):
         track_dict["friction_zone"] = None
 
     scene = {
-        "course_name": ("후보1 통합 코스 (A+B)" if not is_design else "사용자 설계 코스 (track_editor.html)"),
+        "course_name": ("후보1 통합 코스 (A+B)" if not is_design else meta["course_name"]),
         "hall": {"width_m": HALL_W * meta["scale"], "height_m": HALL_H * meta["scale"],
                  "operational_margin_target_m": 0.5 * meta["scale"]},
         "scale": meta["scale"],
@@ -2546,8 +2547,8 @@ def render_preview(res, boxes, outdir, checks):
     if res["grid_slots"]:
         gx = np.mean([g["x"] for g in res["grid_slots"]])
         gy = np.mean([g["y"] for g in res["grid_slots"]])
-        ax.annotate(f"출발 그리드 ({meta['grid_cars']}대, 2열 지그재그)", (gx, gy),
-                    xytext=(gx - 3.2, gy - 1.6), fontsize=9, fontproperties=kr_font,
+        ax.annotate(f"출발 그리드\n({meta['grid_cars']}대, 2열 지그재그)", (gx, gy),
+                    xytext=(gx - 2.6, gy - 1.9), fontsize=9, fontproperties=kr_font,
                     arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
 
     tl = res["traffic_light"]
@@ -2558,7 +2559,7 @@ def render_preview(res, boxes, outdir, checks):
     sf_b = (sfx + math.cos(perp) * half, sfy + math.sin(perp) * half)
     ax.plot([sf_a[0], sf_b[0]], [sf_a[1], sf_b[1]], color="white", lw=2.5, zorder=7, solid_capstyle="butt")
     ax.plot([sf_a[0], sf_b[0]], [sf_a[1], sf_b[1]], color="black", lw=2.5, zorder=6.5, ls=(0, (3, 3)))
-    ax.annotate("출발/결승선", (sf_b[0], sf_b[1]), xytext=(sfx + 2.0, sfy + 0.6), fontproperties=kr_font,
+    ax.annotate("출발/결승선", (sf_b[0], sf_b[1]), xytext=(sfx + 0.9, sfy + 1.6), fontproperties=kr_font,
                 fontsize=9, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
     # start light: bar across the road + glyph beside it (light sits 0.3 m ahead of the grid)
     tperp = tl["yaw"] + math.pi / 2
@@ -2598,8 +2599,9 @@ def render_preview(res, boxes, outdir, checks):
     for i, br in enumerate(branches):
         mx_, my_ = br["arr"][len(br["arr"]) // 2, :2]
         col = branch_colors[i % len(branch_colors)]
+        dx, dy = br.get("label_offset") or (1.2, 0.8 + (i % 3) * 0.4)
         ax.annotate(f"{br['name']} ({br['width_m']:.2f}m)", (mx_, my_),
-                    xytext=(mx_ + 1.2, my_ + 0.8 + (i % 3) * 0.4), fontsize=9,
+                    xytext=(mx_ + dx, my_ + dy), fontsize=9,
                     fontproperties=kr_font, color=col, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
 
     # sector labels
@@ -2647,7 +2649,7 @@ def render_preview(res, boxes, outdir, checks):
     ax.set_aspect("equal")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
-    course_title = "후보1 통합 코스 (A+B)" if not is_design else "사용자 설계 코스 (track_editor.html)"
+    course_title = "후보1 통합 코스 (A+B)" if not is_design else meta["course_name"]
     ax.set_title(f"IT Arena 트랙 평면도 - {course_title}  (전장 {meta['Ltot']:.1f} m, 홀 {hall_w:.1f}x{hall_h:.1f} m)",
                  fontproperties=kr_font, fontsize=12)
 
@@ -2671,10 +2673,11 @@ def render_preview(res, boxes, outdir, checks):
         (plt.Line2D([0], [0], color="#7CCB6E", lw=8), "잔디 완충구간"),
         (plt.Line2D([0], [0], color="black", lw=6), f"벽 (높이 {WALL_H}m, 두께 0.05m)"),
     ] + ([(plt.Line2D([0], [0], color="#B8860B", lw=6), "과속방지턱 구간")] if res["bumps"] else []) + [
-        (plt.Line2D([0], [0], color="#9B59B6", lw=6), "노면변화 구간"),
+    ] + ([(plt.Line2D([0], [0], color="#9B59B6", lw=6), "노면변화 구간")] if get_friction_zones(res) else []) + [
         (plt.Line2D([0], [0], color="white", lw=1.5, marker="s", mec="black"), "출발 그리드 슬롯"),
         (plt.Line2D([0], [0], marker="o", color="dodgerblue", lw=0, mec="black"), "실제 ArUco 마커"),
-        (plt.Line2D([0], [0], marker="x", color="red", lw=0, mew=2), "가짜(FAKE) ArUco 마커"),
+    ] + ([(plt.Line2D([0], [0], marker="x", color="red", lw=0, mew=2), "가짜(FAKE) ArUco 마커")]
+         if any(not m["real"] for m in res["markers"]) else []) + [
         (plt.Line2D([0], [0], marker="^", color="black", lw=0), "출발 신호등"),
         (plt.Line2D([0], [0], color="purple", lw=2), f"홀 외곽선 ({HALL_W:.1f} x {HALL_H:.1f} m)"),
     ]

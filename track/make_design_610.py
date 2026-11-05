@@ -24,14 +24,14 @@ def s_of(p):
 P22 = [(X_M2, 4.5), (X_M3, 4.5)]
 P21 = [(X_L, 2.600 + (2.785 - X_L)), (3.880 + (1.505 - Y_B), Y_B)]
 
-branches = [dict(name="지름길 P22", width_m=0.2, s0=s_of(P22[0]), s1=s_of(P22[1]),
+branches = [dict(name="지름길 P22", width_m=0.2, s0=s_of(P22[0]), s1=s_of(P22[1]), label_offset=[1.7, 0.25],
                  control_points=[], centerline=[list(p) for p in P22]),
-            dict(name="지름길 P21", width_m=0.2, s0=s_of(P21[0]), s1=s_of(P21[1]),
+            dict(name="지름길 P21", width_m=0.2, s0=s_of(P21[0]), s1=s_of(P21[1]), label_offset=[1.7, -0.05],
                  control_points=[], centerline=[list(p) for p in P21])]
 
 d = dict(
     version=4, hall=dict(w=11, h=14.5), track_width_m=0.61, closed=True,
-    corner_join="mitre",
+    corner_join="mitre", course_name="610mm 직각 코스 (2026-11-05 도면)",
     source="track_610mm_build_2026-11-05.pdf pp.46-47 -- grid/traffic light/aruco are PROVISIONAL",
     control_points=[], centerline=[list(p) for p in loop],
     features=dict(
