@@ -2561,14 +2561,15 @@ def render_preview(res, boxes, outdir, checks):
     ax.plot([sf_a[0], sf_b[0]], [sf_a[1], sf_b[1]], color="black", lw=2.5, zorder=6.5, ls=(0, (3, 3)))
     ax.annotate("출발/결승선", (sf_b[0], sf_b[1]), xytext=(sfx + 0.9, sfy + 1.6), fontproperties=kr_font,
                 fontsize=9, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
-    # start light: bar across the road + glyph beside it (light sits 0.3 m ahead of the grid)
+    # start light: bar across the road + glyph beside it (light sits ahead_of_grid ahead of the grid)
     tperp = tl["yaw"] + math.pi / 2
     tw2 = meta["track_w"] / 2
     ax.plot([tl["x"] - math.cos(tperp) * tw2, tl["x"] + math.cos(tperp) * tw2],
             [tl["y"] - math.sin(tperp) * tw2, tl["y"] + math.sin(tperp) * tw2], color="red", lw=2.5, zorder=7)
     gx_, gy_ = tl["x"] - math.cos(tperp) * (half + 0.15), tl["y"] - math.sin(tperp) * (half + 0.15)
     ax.plot(gx_, gy_, marker="^", color="black", ms=11, zorder=8)
-    ax.annotate("신호등 (선두 그리드 앞 0.3 m, ArUco 0·45 좌우 부착)", (gx_, gy_),
+    gap = (tl["s"] - max(g["s"] for g in res["grid_slots"]) - GRID_SLOT_L / 2.0) % meta["Ltot"] if res["grid_slots"] else 0.3
+    ax.annotate(f"신호등 (선두 그리드 앞 {gap:.1f} m, ArUco 0·45 좌우 부착)", (gx_, gy_),
                 xytext=(gx_ + 1.0, gy_ - 0.5), fontproperties=kr_font,
                 fontsize=9, arrowprops=dict(arrowstyle="->", lw=0.8), zorder=10)
 

@@ -9689,7 +9689,7 @@
     </link>
 
     <link name="grid_slot_0">
-      <pose>9.7100 4.7200 0.0037 0 0 1.57080</pose>
+      <pose>9.7100 3.7200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_0_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
@@ -9697,7 +9697,7 @@
     </link>
 
     <link name="grid_slot_1">
-      <pose>9.7100 5.2200 0.0037 0 0 1.57080</pose>
+      <pose>9.7100 4.2200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_1_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
@@ -9705,7 +9705,7 @@
     </link>
 
     <link name="grid_slot_2">
-      <pose>9.7100 5.7200 0.0037 0 0 1.57080</pose>
+      <pose>9.7100 4.7200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_2_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
@@ -9713,7 +9713,7 @@
     </link>
 
     <link name="grid_slot_3">
-      <pose>9.8900 4.5200 0.0037 0 0 1.57080</pose>
+      <pose>9.8900 3.5200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_3_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
@@ -9721,7 +9721,7 @@
     </link>
 
     <link name="grid_slot_4">
-      <pose>9.8900 5.0200 0.0037 0 0 1.57080</pose>
+      <pose>9.8900 4.0200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_4_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
@@ -9729,7 +9729,7 @@
     </link>
 
     <link name="grid_slot_5">
-      <pose>9.8900 5.5200 0.0037 0 0 1.57080</pose>
+      <pose>9.8900 4.5200 0.0037 0 0 1.57080</pose>
       <visual name="grid_slot_5_vis">
         <geometry><box><size>0.2500 0.1700 0.001</size></box></geometry>
         <material><ambient>0.05 0.05 0.05 1</ambient><diffuse>0.05 0.05 0.05 1</diffuse></material>
