@@ -23,20 +23,20 @@ STL = os.path.join(HERE, "stl")
 # ---- 치수 (mm). 첫 출력 후 실측해서 여기만 고치면 된다 ------------------------------------------
 T = {"G": 3.0, "E": 10.0}       # 판 두께: 회색 포맥스 3T, EVA 10T
 CLR = {"G": 0.5, "E": 0.5}      # 홈 여유 (EVA는 눌리므로 빡빡해도 됨)
-H = 150.0        # 받침 높이 (벽 400 mm의 아래 37 %)
-D = 70.0         # 받침 바닥 길이 (벽 뒷면부터)
-WID = 10.0       # 받침 두께(벽 따라). 이음 받침은 판마다 WID씩 = 20
-PLATE = 4.0      # 뒤판·바닥판·빗대 두께
-LIP_T, LIP_H = 2.4, 60.0   # 도로 쪽 턱 (잔디 가장자리가 여기에 닿음)
+H = 100.0        # 받침 높이 (11-07: 150 → 100, 출력 21분 → 8분)
+D = 50.0         # 받침 바닥 길이 (벽 뒷면부터)
+WID = 6.0        # 받침 두께(벽 따라). 이음 받침은 판마다 WID씩 = 12
+PLATE = 2.5      # 뒤판·바닥판·빗대 두께 = 0.42 mm 선 6줄 (채움 없이 벽 선만으로 꽉 참)
+LIP_T, LIP_H = 2.4, 40.0   # 도로 쪽 턱 (잔디 가장자리가 여기에 닿음)
 BR = 2.4         # 벽이 올라앉는 바닥 다리 두께
-CL_ARM = 40.0    # 클립 팔 길이 (이음·코너에서 각 판 쪽으로)
-CL_LEG = 20.0    # 클립 다리 깊이 (판 윗변에서 아래로)
-CL_WALL = 2.0    # 클립 살 두께
+CL_ARM = 30.0    # 클립 팔 길이 (이음·코너에서 각 판 쪽으로)
+CL_LEG = 15.0    # 클립 다리 깊이 (판 윗변에서 아래로)
+CL_WALL = 1.6    # 클립 살 두께 (선 4줄)
 SPACING = 600.0  # 받침 최대 간격 (PDF 18쪽 '우선 600 mm 이하')
 CORNER_OFF = 120.0   # 코너에서 첫 받침까지
 MIN_PANEL = 300.0    # 이보다 짧은 판은 양 끝 이음 받침만
 PLA_DENSITY = 1.24
-FILL = {"support": 0.6, "joint": 0.6, "clip": 1.0}   # 슬라이서 기본(벽 2·채움 15 %)에서 유효 충전율 추정: 4 mm 부재 ≈ 0.6, 2 mm 살 = 거의 꽉
+FILL = {"support": 0.8, "joint": 0.8, "clip": 0.95}  # Bambu Studio 0.20 Standard 슬라이스 실측 필라멘트량 ÷ STL 부피 (11-07)
 
 
 # ---- 벽·도로 ---------------------------------------------------------------------------------------
@@ -346,7 +346,7 @@ fig.tight_layout(); fig.savefig(os.path.join(HERE, "wall_supports.png"), dpi=130
 fig, axs = plt.subplots(1, 3, figsize=(13, 5.2))
 for ax, mat in zip(axs[:2], ("G", "E")):
     pr = support_profile(mat)
-    ax.fill(*pr.exterior.xy, color="#8aa", ec="k")
+    fill(ax, pr, color="#8aa", ec="k", lw=0.8)
     s = T[mat]
     ax.add_patch(plt.Rectangle((0, BR), s, 400 - BR, color="#bbb" if mat == "G" else "#f0b070", alpha=0.6))
     ax.add_patch(plt.Rectangle((-200, 0), 200 - LIP_T, 6, color="#7cc576"))
@@ -363,7 +363,7 @@ o, v = clip_kinds[next(k for k in clip_kinds if clip_kinds[k]["name"].startswith
 ax.fill(*o.exterior.xy, color="#8aa", ec="k")
 for g in getattr(v, "geoms", [v]):
     ax.fill(*g.exterior.xy, color="white", ec="#555", ls="--")
-ax.set_aspect("equal"); ax.set_title(f"ㄷ자 클립 (위에서 본 모양, 일자 회색-회색)\n점선 = 판이 들어가는 홈 · 덮개 {CL_WALL:.0f} mm + 다리 {CL_LEG:.0f} mm", fontsize=9)
+ax.set_aspect("equal"); ax.set_title(f"ㄷ자 클립 (위에서 본 모양, 일자 회색-회색)\n점선 = 판이 들어가는 홈 · 덮개 {CL_WALL:g} mm + 다리 {CL_LEG:g} mm", fontsize=9)
 fig.tight_layout(); fig.savefig(os.path.join(HERE, "wall_parts_section.png"), dpi=130); plt.close(fig)
 
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
