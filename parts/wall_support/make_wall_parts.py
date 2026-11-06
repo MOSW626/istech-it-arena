@@ -22,7 +22,7 @@ STL = os.path.join(HERE, "stl")
 
 # ---- 치수 (mm). 첫 출력 후 실측해서 여기만 고치면 된다 ------------------------------------------
 T = {"G": 3.0, "E": 10.0}       # 판 두께: 회색 포맥스 3T, EVA 10T
-CLR = {"G": 0.5, "E": 0.5}      # 홈 여유 (EVA는 눌리므로 빡빡해도 됨)
+CLR = {"G": 0.2, "E": 0.5}      # 홈 여유: 회색은 끼워 맞춤(볼트·테이프 없이 마찰로 잡음), EVA는 눌리므로 0.5
 H = 100.0        # 받침 높이 (11-07: 150 → 100, 출력 21분 → 8분)
 D = 50.0         # 받침 바닥 길이 (벽 뒷면부터)
 WID = 6.0        # 받침 두께(벽 따라). 이음 받침은 판마다 WID씩 = 12
@@ -353,7 +353,7 @@ for ax, mat in zip(axs[:2], ("G", "E")):
     ax.annotate("잔디 6 mm", (-120, 6), (-190, 40), fontsize=8, arrowprops=dict(arrowstyle="-"))
     ax.text(s / 2, 300, "벽 " + ("회색 3T" if mat == "G" else "EVA 10T"), rotation=90, ha="center", fontsize=9)
     ax.annotate(f"높이 {H:.0f}", (s + PLATE + 2, H), (s + 30, H + 25), fontsize=8, arrowprops=dict(arrowstyle="-"))
-    ax.annotate(f"바닥 {D:.0f} (양면테이프)", (s + D, 2), (s + 25, -30), fontsize=8, arrowprops=dict(arrowstyle="-"))
+    ax.annotate(f"바닥 {D:.0f}", (s + D, 2), (s + 25, -30), fontsize=8, arrowprops=dict(arrowstyle="-"))
     ax.annotate(f"도로 쪽 턱 {LIP_T}×{LIP_H:.0f}", (-LIP_T, LIP_H), (-170, LIP_H + 40), fontsize=8, arrowprops=dict(arrowstyle="-"))
     ax.set_xlim(-200, 110); ax.set_ylim(-50, 420); ax.set_aspect("equal")
     ax.set_title(f"받침 단면 ({'회색 3T' if mat == 'G' else 'EVA 10T'}) · 홈 {T[mat] + CLR[mat]:.1f} mm · 두께 {WID:.0f} mm", fontsize=9)

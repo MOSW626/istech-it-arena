@@ -1,6 +1,6 @@
 부품,필요 수량,예비 포함(+10%),개당 PLA_g(추정),합계_g(예비 포함),STL
 clip_corner135_in_E10_E10,1,2,4.9,10,stl/clip_corner135_in_E10_E10.stl
-clip_corner135_out_E10_G3,1,2,4.7,9,stl/clip_corner135_out_E10_G3.stl
+clip_corner135_out_E10_G3,1,2,4.8,10,stl/clip_corner135_out_E10_G3.stl
 clip_corner90_in_E10_E10,9,10,4.3,43,stl/clip_corner90_in_E10_E10.stl
 clip_corner90_in_E10_G3,3,4,4.3,17,stl/clip_corner90_in_E10_G3.stl
 clip_corner90_in_E10_G3_mirror,1,2,4.3,9,stl/clip_corner90_in_E10_G3_mirror.stl
@@ -10,10 +10,10 @@ clip_corner90_out_E10_G3_mirror,3,4,5.3,21,stl/clip_corner90_out_E10_G3_mirror.s
 clip_corner90_out_G3_G3,2,3,4.6,14,stl/clip_corner90_out_G3_G3.stl
 clip_inline_E10_E10,12,14,5.2,73,stl/clip_inline_E10_E10.stl
 clip_inline_E10_G3,1,2,5.0,10,stl/clip_inline_E10_G3.stl
-clip_inline_G3_G3,23,26,4.4,114,stl/clip_inline_G3_G3.stl
+clip_inline_G3_G3,23,26,4.3,113,stl/clip_inline_G3_G3.stl
 joint_support_E10_E10,12,14,8.7,122,stl/joint_support_E10_E10.stl
 joint_support_G3_E10,1,2,8.6,17,stl/joint_support_G3_E10.stl
 joint_support_G3_G3,23,26,8.5,221,stl/joint_support_G3_G3.stl
 support_E10,72,80,4.4,349,stl/support_E10.stl
 support_G3,92,102,4.3,434,stl/support_G3.stl
-합계,261,,,1505,
+합계,261,,,1503,

@@ -253,3 +253,71 @@ print(f"block={BLOCK}mm"); print(f"GRASS_OK area={GRASS.area:.3f}m2 pieces={len(
       f"strip_total={sum(r['length_mm'] for r in strips) / 1000:.2f}m blocks={len(blocks)} roll_used={used:.2f}m")
 for r in others:
     print(" ", r["id"], r["kind"], r["length_mm"], "x", r["width_mm"], r["along"])
+
+# --- 현장 인쇄용 PDF (A4 4쪽: 순서 · 재단도(가로) · 배치도 · 조각표) ---------------------------------
+from PIL import Image
+A4 = (8.27, 11.69)
+pages = []
+
+
+def page(fig):
+    path = os.path.join(HERE, f"_page{len(pages)}.png")
+    fig.savefig(path, dpi=200); plt.close(fig)
+    pages.append(path)
+
+
+fig = plt.figure(figsize=A4)
+fig.text(0.07, 0.95, "잔디 재단·설치 — 610mm 직각 코스", fontsize=18, weight="bold")
+fig.text(0.07, 0.925, "IT Arena 2026 · track_610mm_build_2026-11-05.pdf 기준 · parts/grass", fontsize=9, color="#555")
+body = [
+    ("핵심 숫자", [f"폭: 도로 양옆 각 200 mm (본선·지름길 모두). 도로 가장자리부터 벽 면까지 전부 잔디",
+                   f"조각 {len(rows)}개 (20 cm 띠 {len(strips)} · 모양 조각 {len(others)}) · 면적 {GRASS.area:.2f} m²",
+                   f"1 m 폭 롤 {used:.2f} m 사용 / {ROLL_LEN:g} m (남는 {ROLL_LEN - used:.2f} m는 보수용)"]),
+    ("재단 (2쪽 재단도)", ["① 롤 폭을 잰다. 1,000 mm 미만이면 5번째 줄이 좁아짐 → 그 줄은 벽 쪽에 쓴다",
+                         "② 롤을 뒷면이 위로 펼치고, 블록 길이만큼 재서 폭 방향으로 끊는다 (직각자)",
+                         "③ 뒷면에 200·400·600·800 mm 선을 긋고, 긴 금속자 + 커터로 뒷면에서 자른다",
+                         "④ 한 줄에 조각이 여럿이면 재단도 길이대로 끊고, 뒷면에 조각 번호를 적는다",
+                         "⑤ 모양 조각(P21 사선 주변)은 현장에서 대고 마무리: S18 양 끝 45°, S27 삼각형(B5 대각선)"]),
+    ("설치 (3쪽 배치도)", ["순서: 도로 판 → 잔디 → 벽·받침",
+                         "① 하루 전에 띠를 펴 둔다 (말린 버릇 → 가장자리 들뜸). 반대로 살짝 말아 두면 빨리 펴짐",
+                         "② 도로 판 가장자리에 맞대어 깐다. 도로 위로 올라오면 안 됨. 바깥 가장자리 = 벽 좌표선",
+                         "③ 테이프는 기본으로 안 쓴다. 벽 쪽은 받침 턱과 벽 아래가 눌러 줌",
+                         "④ 다 깐 뒤 도로 쪽 가장자리가 들뜬 곳만 양면테이프를 짧게 (바닥 자국은 구석에서 먼저 시험)"]),
+]
+y = 0.88
+for head, lines in body:
+    fig.text(0.07, y, head, fontsize=12, weight="bold"); y -= 0.028
+    for ln in lines:
+        fig.text(0.09, y, ln, fontsize=9.2); y -= 0.024
+    y -= 0.015
+fig.text(0.07, y, "블록 목록 (롤에서 끊는 순서)", fontsize=12, weight="bold"); y -= 0.03
+for i, b in enumerate(blocks, 1):
+    wide_blk = any(p["width_mm"] > LANE * 1000 for l in b["lanes"] for p in l)
+    lanes = "통째로 → 대각선으로 잘라 S27 삼각형" if wide_blk else "  |  ".join(" + ".join(p["id"] for p in l) for l in b["lanes"])
+    fig.text(0.09, y, f"B{i}  {b['length_mm']:>5} mm", fontsize=9.5, weight="bold", family="monospace")
+    fig.text(0.27, y, lanes, fontsize=8.6); y -= 0.024
+page(fig)
+for img in ("grass_cutting.png", "grass_layout.png"):
+    fig = plt.figure(figsize=A4[::-1] if img == "grass_cutting.png" else A4)   # 재단도는 가로
+    im = plt.imread(os.path.join(HERE, img))
+    ax = fig.add_axes([0.03, 0.03, 0.94, 0.94]); ax.imshow(im); ax.set_axis_off()
+    page(fig)
+fig = plt.figure(figsize=A4)
+fig.text(0.07, 0.95, "조각표 — 뒷면에 번호를 적어 두세요", fontsize=14, weight="bold")
+hdr = ["조각", "종류", "길이 mm", "폭 mm", "붙는 벽 (도면 W번호)"]
+xs_ = [0.07, 0.17, 0.31, 0.42, 0.52]
+y = 0.915
+for x, h in zip(xs_, hdr):
+    fig.text(x, y, h, fontsize=9, weight="bold")
+y -= 0.022
+for r in rows:
+    vals = [r["id"], r["kind"], f"{r['length_mm']:,}", f"{r['width_mm']}", r["along"]]
+    for x, v in zip(xs_, vals):
+        fig.text(x, y, v, fontsize=8.6)
+    y -= 0.0215
+page(fig)
+ims = [Image.open(p).convert("RGB") for p in pages]
+ims[0].save(os.path.join(HERE, "grass_guide.pdf"), save_all=True, append_images=ims[1:], resolution=200)
+for p in pages:
+    os.remove(p)
+print("GUIDE_PDF_OK pages", len(ims))
