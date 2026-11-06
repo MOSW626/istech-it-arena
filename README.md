@@ -20,6 +20,7 @@
 | 대회 규칙 · 일정 · 패널티 · 예산 | [**MANUAL.md**](MANUAL.md) |
 | **PDB(전원 모듈) 사양 · 데이터시트** | [**docs/hardware/power-modules.md**](docs/hardware/power-modules.md) |
 | **경기장 사진 · 조명 조건** | [**docs/venue/**](docs/venue/) |
+| 트랙 시공: 잔디 재단 · 벽 받침/클립 STL | [parts/grass/](parts/grass/) · [parts/wall_support/](parts/wall_support/) |
 | 과속방지턱 (2026-11-01 제거 — 기록용) | [parts/speed_bump/](parts/speed_bump/) |
 | 트랙 맵 파일 (시뮬레이터 · 시공용) | [**track/**](track/) — 사용법과 **ArUco 검출 주의사항**은 [track/README.md](track/README.md) |
 | 파일 통째로 다운로드 | [**Releases**](../../releases) 에서 zip — 항상 최신 릴리즈를 받으세요 |
