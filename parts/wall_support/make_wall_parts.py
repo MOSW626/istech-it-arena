@@ -22,9 +22,9 @@ STL = os.path.join(HERE, "stl")
 
 # ---- 치수 (mm). 첫 출력 후 실측해서 여기만 고치면 된다 ------------------------------------------
 T = {"G": 3.0, "E": 10.0}       # 판 두께: 회색 포맥스 3T, EVA 10T
-CLR = {"G": 0.2, "E": 0.5}      # 홈 여유: 회색은 끼워 맞춤(볼트·테이프 없이 마찰로 잡음), EVA는 눌리므로 0.5
-H = 100.0        # 받침 높이 (11-07: 150 → 100, 출력 21분 → 8분)
-D = 50.0         # 받침 바닥 길이 (벽 뒷면부터)
+CLR = {"G": 0.15, "E": 0.5}      # 홈 여유: 회색은 끼워 맞춤(볼트·테이프 없이 마찰로 잡음), EVA는 눌리므로 0.5
+H = 150.0        # 받침 높이 (11-07 100으로 줄였다가 11-09 150으로 되돌림, 1개 11분)
+D = 60.0         # 받침 바닥 길이 (벽 뒷면부터, 11-09 50 → 60)
 WID = 6.0        # 받침 두께(벽 따라). 이음 받침은 판마다 WID씩 = 12
 PLATE = 2.5      # 뒤판·바닥판·빗대 두께 = 0.42 mm 선 6줄 (채움 없이 벽 선만으로 꽉 참)
 LIP_T, LIP_H = 2.4, 40.0   # 도로 쪽 턱 (잔디 가장자리가 여기에 닿음)
@@ -228,9 +228,9 @@ def footprint(r):
 
 
 # ---- 실행 -------------------------------------------------------------------------------------------
-os.makedirs(STL, exist_ok=True)
-for f in os.listdir(STL):
-    os.remove(os.path.join(STL, f))
+import shutil
+shutil.rmtree(STL, ignore_errors=True)   # 이전 이름의 파일·폴더가 남지 않게
+os.makedirs(STL)
 made, counts, masses = {}, collections.Counter(), {}
 
 name_of = {"G": "G3", "E": "E10"}
@@ -293,20 +293,34 @@ for n, tm in made.items():
     b = tm.bounds[1] - tm.bounds[0]
     assert max(b[0], b[1]) < 250, f"{n}: P1S 베드(256 mm)보다 큼 {b}"
 
+def ko_dir(n):
+    return "3_ㄷ자클립" if n.startswith("clip") else "2_이음받침" if n.startswith("joint") else "1_받침"
+def ko_name(n):   # support_G3 → 받침_회색, clip_corner90_out_E10_G3_mirror → 코너90_바깥_EVA+회색_좌우반대
+    s = n.replace("joint_support_", "이음받침_").replace("support_", "받침_").replace("clip_inline_", "일자_")
+    s = s.replace("clip_corner", "코너").replace("_out_", "_바깥_").replace("_in_", "_안쪽_").replace("_mirror", "_좌우반대")
+    s = s.replace("G3", "회색").replace("E10", "EVA")
+    for a in ("회색", "EVA"):
+        for b in ("회색", "EVA"):
+            s = s.replace(f"{a}_{b}", f"{a}+{b}")
+    return s
+
 # ---- 출력 -------------------------------------------------------------------------------------------
 with open(os.path.join(HERE, "supports.csv"), "w", newline="") as f:
     wr = csv.writer(f); wr.writerow(["번호", "종류", "벽", "벽 시작점에서_mm", "x_m", "y_m", "받침이 서는 방향(nx,ny)"])
     for i, r in enumerate(sorted(rows, key=lambda r: (r["walls"].split("|")[-1], r.get("s_mm", 0))), 1):
         nm = f"support_{name_of[r['mats']]}" if r["kind"] == "support" else \
             "joint_support_" + "_".join(name_of[m] for m in (("G", "E") if r["mats"] == "EG" else tuple(r["mats"])))
-        wr.writerow([i, nm, r["walls"], f"{r['s_mm']:.0f}" if "s_mm" in r else "이음점", f"{r['x']:.3f}", f"{r['y']:.3f}", f"{r['n'][0]:+.0f},{r['n'][1]:+.0f}" if abs(r['n'][0]) in (0, 1) else f"{r['n'][0]:+.3f},{r['n'][1]:+.3f}"])
+        wr.writerow([i, ko_name(nm), r["walls"], f"{r['s_mm']:.0f}" if "s_mm" in r else "이음점", f"{r['x']:.3f}", f"{r['y']:.3f}", f"{r['n'][0]:+.0f},{r['n'][1]:+.0f}" if abs(r['n'][0]) in (0, 1) else f"{r['n'][0]:+.3f},{r['n'][1]:+.3f}"])
 total_g = 0
 with open(os.path.join(HERE, "parts_count.csv"), "w", newline="") as f:
     wr = csv.writer(f); wr.writerow(["부품", "필요 수량", "예비 포함(+10%)", "개당 PLA_g(추정)", "합계_g(예비 포함)", "STL"])
     for n in sorted(made):
         need = counts[n]; spare = math.ceil(need * 1.1)
         total_g += spare * masses[n]
-        wr.writerow([n, need, spare, f"{masses[n]:.1f}", f"{spare * masses[n]:.0f}", f"stl/{n}.stl"])
+        fn = f"{ko_dir(n)}/{ko_name(n)}_{spare}개.stl"    # 사람이 보는 이름: 폴더=종류, 끝=뽑을 개수(예비 포함)
+        os.makedirs(os.path.join(STL, ko_dir(n)), exist_ok=True)
+        os.rename(os.path.join(STL, n + ".stl"), os.path.join(STL, fn))
+        wr.writerow([n, need, spare, f"{masses[n]:.1f}", f"{spare * masses[n]:.0f}", f"stl/{fn}"])
     wr.writerow(["합계", sum(counts.values()), "", "", f"{total_g:.0f}", ""])
 
 import matplotlib
@@ -356,7 +370,7 @@ for ax, mat in zip(axs[:2], ("G", "E")):
     ax.annotate(f"바닥 {D:.0f}", (s + D, 2), (s + 25, -30), fontsize=8, arrowprops=dict(arrowstyle="-"))
     ax.annotate(f"도로 쪽 턱 {LIP_T}×{LIP_H:.0f}", (-LIP_T, LIP_H), (-170, LIP_H + 40), fontsize=8, arrowprops=dict(arrowstyle="-"))
     ax.set_xlim(-200, 110); ax.set_ylim(-50, 420); ax.set_aspect("equal")
-    ax.set_title(f"받침 단면 ({'회색 3T' if mat == 'G' else 'EVA 10T'}) · 홈 {T[mat] + CLR[mat]:.1f} mm · 두께 {WID:.0f} mm", fontsize=9)
+    ax.set_title(f"받침 단면 ({'회색 3T' if mat == 'G' else 'EVA 10T'}) · 홈 {T[mat] + CLR[mat]:g} mm · 두께 {WID:.0f} mm", fontsize=9)
     ax.axvline(0, color="r", lw=0.6, ls="--"); ax.text(2, 410, "← 도로 쪽 | 도면 W좌표선", fontsize=7, color="r")
 ax = axs[2]
 o, v = clip_kinds[next(k for k in clip_kinds if clip_kinds[k]["name"].startswith("clip_inline_G3_G3"))]["shape"]
@@ -381,7 +395,7 @@ for i, n in enumerate(show, 1):
     lo, hi = v.min(0), v.max(0); c = (lo + hi) / 2; r = (hi - lo).max() / 2
     ax.set_xlim(c[0] - r, c[0] + r); ax.set_ylim(c[1] - r, c[1] + r); ax.set_zlim(c[2] - r, c[2] + r)
     ax.set_box_aspect((1, 1, 1)); ax.view_init(25, -60); ax.set_axis_off()
-    ax.set_title(f"{n}\n{counts[n]}개 · 약 {masses[n]:.0f} g", fontsize=9)
+    ax.set_title(f"{ko_name(n)}\n필요 {counts[n]}개 · 약 {masses[n]:.0f} g", fontsize=9)
 fig.suptitle("부품 모양 (설치 방향). 출력은 받침 = 옆으로 눕혀서, 클립 = 덮개면이 베드로", fontsize=11)
 fig.tight_layout(); fig.savefig(os.path.join(HERE, "wall_parts_3d.png"), dpi=110); plt.close(fig)
 
