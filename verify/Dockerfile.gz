@@ -1,0 +1,6 @@
+FROM ros:jazzy-ros-base
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ros-jazzy-ros-gz-sim \
+ && rm -rf /var/lib/apt/lists/*
+ENV GZ_SIM_RESOURCE_PATH=/world
+WORKDIR /world

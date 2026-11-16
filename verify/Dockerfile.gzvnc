@@ -1,0 +1,5 @@
+FROM gzgui:jazzy
+# 컨테이너 안에서 렌더링하고 화면만 VNC로 내보낸다 (원격 GLX 회피)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      x11vnc openbox \
+ && rm -rf /var/lib/apt/lists/*

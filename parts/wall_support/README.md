@@ -92,3 +92,15 @@ python parts/wall_support/make_wall_parts.py
 ```
 
 STL은 전부 닫힌 입체(watertight)인지 확인한 뒤에만 저장합니다.
+
+## P1S 판 묶음 (`plates/`, 11-11 MR 출력분)
+
+`pack_plates.py`가 부품을 P1S 판(256 mm)에 빽빽하게 배치해 `plates/판NN_N개.3mf`로 만듭니다(각 부품이 별도 물체, 왼쪽 앞 금지 구역 회피).
+
+```bash
+python parts/wall_support/pack_plates.py 받침_EVA=80 받침_회색=22 클립=all
+```
+
+- 판 17개 · 약 34시간 (브림 Outer and inner 5 mm 기준). 내용은 `plates/plates.csv`, 배치는 `plates/plates.png`
+- Bambu Studio에서 **Arrange(정렬) 누르지 말 것**. 배치가 흐트러집니다.
+- 부품을 Z로 쌓는(프라모델식) 방법도 시도했지만, 층이 잘 안 떨어져서 쓰지 않았습니다.

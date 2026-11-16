@@ -1,0 +1,11 @@
+FROM gzcheck:jazzy
+# 소프트웨어 렌더링(GPU 없음) + 가상 디스플레이 + 프레임버퍼 캡처
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      xvfb x11-utils x11-apps imagemagick \
+      libgl1-mesa-dri libglx-mesa0 libegl-mesa0 mesa-utils \
+      ros-jazzy-ros-gz-sim ros-jazzy-ros-gz-bridge \
+ && rm -rf /var/lib/apt/lists/*
+ENV LIBGL_ALWAYS_SOFTWARE=1 \
+    GALLIUM_DRIVER=llvmpipe \
+    QT_QPA_PLATFORM=xcb \
+    GZ_SIM_RESOURCE_PATH=/world
